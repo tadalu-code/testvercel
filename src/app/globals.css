@@ -97,3 +97,17 @@
     filter: brightness(1.2); 
   }
 }
+
+/* CURSOR POINTER CHO TẤT CẢ CÁC PHẦN TỬ CLICK ĐƯỢC */
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+label[for],
+select,
+summary,
+[onclick] {
+  cursor: pointer;
+}

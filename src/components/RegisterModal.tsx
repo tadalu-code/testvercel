@@ -6,22 +6,31 @@ interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  productName?: string;
 }
 
-export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH ĐƯỢC HỖ TRỢ QUÝ KHÁCH" }: RegisterModalProps) {
+export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH ĐƯỢC HỖ TRỢ QUÝ KHÁCH", productName }: RegisterModalProps) {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', subject: '', message: '' });
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  // THÊM: State lưu lỗi số điện thoại
+  const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
       setIsClosing(false);
+      setPhoneError(''); // Xóa lỗi cũ khi mở lại modal
       document.body.style.overflow = 'hidden';
     }
   }, [isOpen]);
 
-  // Hàm đóng có animation ngược
+  useEffect(() => {
+    if (isOpen && productName) {
+      setFormData(prev => ({ ...prev, subject: `Cần mua sản phẩm: ${productName}` }));
+    }
+  }, [isOpen, productName]);
+
   const handleClose = () => {
     setIsClosing(true);
     document.body.style.overflow = 'unset';
@@ -35,10 +44,22 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Ẩn lỗi khi người dùng bắt đầu nhập lại số điện thoại
+    if (name === 'phone') {
+      setPhoneError('');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // KIỂM TRA SỐ ĐIỆN THOẠI HỢP LỆ (Định dạng VN: bắt đầu bằng 03, 05, 07, 08, 09 và đủ 10 số)
+    const phoneRegex = /^(03|05|07|08|09)+([0-9]{8})$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setPhoneError('Vui lòng nhập số điện thoại hợp lệ (10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09).');
+      return; // Dừng lại, không submit form
+    }
+
     handleClose();
     setFormData({ name: '', phone: '', email: '', subject: '', message: '' });
   };
@@ -48,7 +69,6 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
 
-      {/* LỚP NỀN */}
       <div
         className="absolute inset-0 bg-black/70"
         style={{
@@ -59,7 +79,6 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
         onClick={handleClose}
       ></div>
 
-      {/* NỘI DUNG MODAL */}
       <div
         className="w-full max-w-[1000px] rounded-[10px] shadow-2xl relative z-10"
         style={{
@@ -69,7 +88,6 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
             : 'modalOpen 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
         }}
       >
-        {/* Nút đóng */}
         <button
           onClick={handleClose}
           className="absolute -top-4 -right-4 z-20 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all hover:scale-110 shadow-md border border-gray-100"
@@ -79,7 +97,6 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
 
         <div className="px-4 sm:px-8 md:px-12 lg:px-[50px] py-12 md:py-15 text-white">
 
-          {/* TIÊU ĐỀ */}
           <div className="text-center mb-6">
             <h2
               className="font-black text-[16px] sm:text-[24px] md:text-[36px] mb-2 uppercase"
@@ -92,8 +109,7 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
             </p>
           </div>
 
-          {/* FORM */}
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3 relative">
             <input
               type="text"
               name="name"
@@ -103,15 +119,25 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
               className="w-full px-3 py-2.5 rounded-[4px] text-gray-700 bg-white outline-none text-[14px] placeholder:text-gray-700 shadow-sm"
               required
             />
-            <input
-              type="tel"
-              name="phone"
-              placeholder="Điện thoại"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2.5 rounded-[4px] text-gray-700 bg-white outline-none text-[14px] placeholder:text-gray-700 shadow-sm"
-              required
-            />
+            
+            {/* Cột Số điện thoại có thêm hiển thị lỗi */}
+            <div className="relative">
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Điện thoại"
+                value={formData.phone}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2.5 rounded-[4px] text-gray-700 bg-white outline-none text-[14px] placeholder:text-gray-700 shadow-sm transition-all ${phoneError ? 'border-2 border-red-500' : ''}`}
+                required
+              />
+              {phoneError && (
+                <span className="absolute -bottom-5 left-0 text-red-100 font-medium text-[12px] bg-red-600 px-2 py-0.5 rounded shadow-sm whitespace-nowrap z-10">
+                  {phoneError}
+                </span>
+              )}
+            </div>
+
             <input
               type="email"
               name="email"
@@ -130,7 +156,7 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
               className="w-full px-3 py-2.5 rounded-[4px] text-gray-700 bg-white outline-none text-[14px] placeholder:text-gray-700 shadow-sm"
               required
             />
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 mt-1">
               <textarea
                 name="message"
                 placeholder="Nội dung"

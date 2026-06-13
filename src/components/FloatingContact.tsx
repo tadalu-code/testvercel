@@ -42,7 +42,8 @@ const FloatingContact = () => {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`relative flex items-center justify-center transition-all duration-500 rounded-full hover:scale-110
+              // ĐÃ THÊM LẠI: bg-white và shadow-lg ở đây
+              className={`relative flex items-center justify-center transition-all duration-500 rounded-full hover:scale-110 bg-white shadow-lg
                 md:pointer-events-auto md:opacity-100 md:translate-y-0 md:scale-100
                 ${isOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-12 scale-50 pointer-events-none'}
               `}
@@ -55,7 +56,7 @@ const FloatingContact = () => {
               <img
                 src={item.icon}
                 alt={item.id}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain p-1" // Thêm lại p-1 để icon cách đều viền trắng
               />
             </a>
           );
@@ -65,13 +66,14 @@ const FloatingContact = () => {
       {/* 2. NÚT PHONE */}
       <a
         href="tel:02926537595"
-        className="pointer-events-auto flex items-center justify-center rounded-full animate-phonering"
+        // ĐÃ THÊM LẠI: bg-white và shadow-lg ở đây
+        className="pointer-events-auto flex items-center justify-center rounded-full bg-white shadow-lg animate-phonering"
         style={{ width: '45px', height: '45px' }}
       >
         <img
           src="https://nongduocmiennam.vn/images/icons/phone-call-1-300x300.png"
           alt="phone"
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain p-1" // Thêm lại p-1
         />
       </a>
 

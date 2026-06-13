@@ -97,12 +97,13 @@ export default function Navbar({ navData }: { navData: any[] }) {
             <img key={s} src={`https://nongduocmiennam.vn/images/icons/${s}.png`} className="w-8 h-8 object-contain shrink-0" alt={s} />
           ))}
 
-          {/* Nút Tuyển dụng */}
+          {/* Nút Liên hệ tư vấn */}
           <button
+            onClick={() => setIsModalOpen(true)}
             className="ml-auto shrink-0 text-white text-[11px] font-black uppercase px-3 py-1.5 rounded-[4px] shadow tracking-wide"
             style={{ background: 'linear-gradient(90deg, rgb(216, 0, 0) 0%, rgb(245, 2, 0) 50%, rgb(187, 1, 0) 100%)' }}
           >
-            Tuyển dụng
+            Liên hệ tư vấn
           </button>
         </div>
       </div>

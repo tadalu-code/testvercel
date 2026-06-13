@@ -120,7 +120,7 @@ export default function Footer({ navData }: { navData: any[] }) {
 
                             {/* Phần bên phải: Text Design by */}
                             <p className="text-[13px] opacity-75 font-normal">
-                                Design by <span className="font-semibold hover:underline cursor-pointer">KATEC.vn</span>
+                                Design by <a href="https://katec.vn/" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline cursor-pointer">Katec.vn</a>
                             </p>
 
                         </div>

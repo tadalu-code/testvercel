@@ -258,7 +258,7 @@ export default function ProductDetailClient({ category, slug, initialProduct }: 
         </div>
       </main>
 
-      <RegisterModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Liên hệ tư vấn" />
+     <RegisterModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Liên hệ tư vấn" productName={product.name} />
 
       {/* LIGHTBOX */}
       {isGalleryOpen && (

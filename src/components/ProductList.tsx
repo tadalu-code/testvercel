@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getProducts, getCategories } from "@/services/api";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
+import RegisterModal from "./RegisterModal";
 
 export default function ProductList({ activeCat: initialActiveCat }: { activeCat: string }) {
   const [products, setProducts] = useState<any[]>([]);
@@ -10,6 +11,8 @@ export default function ProductList({ activeCat: initialActiveCat }: { activeCat
   const [loading, setLoading] = useState(true);
   const [currentCat, setCurrentCat] = useState(initialActiveCat);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState("");
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -140,9 +143,17 @@ export default function ProductList({ activeCat: initialActiveCat }: { activeCat
                     {product.name}
                   </h3>
 
-                  <div className="mt-3 w-full py-2 bg-[#007bff] text-white text-[13px] font-medium text-center rounded-[4px] group-hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedProduct(product.name);
+                      setIsModalOpen(true);
+                    }}
+                    className="mt-3 w-full py-2 bg-[#007bff] text-white text-[13px] font-medium text-center rounded-[4px] hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
                     Liên hệ
-                  </div>
+                  </button>
                 </div>
               </Link>
             ))}
@@ -150,6 +161,13 @@ export default function ProductList({ activeCat: initialActiveCat }: { activeCat
         )}
       </div>
       
+      {/* MODAL LIÊN HỆ */}
+      <RegisterModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title="Liên hệ tư vấn" 
+        productName={selectedProduct} 
+      />
     </main>
   );
 }

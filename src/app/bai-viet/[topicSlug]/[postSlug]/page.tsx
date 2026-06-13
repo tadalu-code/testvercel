@@ -118,36 +118,38 @@ export default async function PostDetailPage({ params }: Props) {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* CỘT TRÁI */}
           <div className="lg:w-[75%]">
-            <div className="bg-white rounded-[4px] border border-[#e1e1e1] overflow-hidden mb-8 shadow-sm">
-              <div className="px-5 md:px-8 pt-5 pb-8">
+            <div className="bg-white !border-0 lg:!border lg:!border-solid lg:!border-[#e1e1e1] !shadow-none lg:!shadow-sm !rounded-none lg:!rounded-[4px] overflow-hidden mb-8 -mx-4 lg:mx-0">
+              <div className="!pt-0 lg:!px-8 lg:!pt-5 pb-8">
                 {/* Thanh tiêu đề xanh — nằm BÊN TRONG card */}
-                <div className="bg-[#007d3d] rounded-[4px] px-5 py-4 mb-5">
+                <div className="bg-[#007d3d] !rounded-none lg:!rounded-[4px] px-4 md:px-5 py-4 mb-5">
                   <h1 className="text-white text-[18px] md:text-[20px] font-bold uppercase leading-snug">
                     {title}
                   </h1>
                 </div>
 
-                {/* Ngày tháng */}
-                <div className="flex items-center gap-2 text-[#666] text-[13px] font-bold mb-4">
-                  <Calendar size={16} className="text-[#007d3d]" />
-                  <span>{formatVietnameseDate(date)}</span>
+                <div className="px-4 lg:px-0">
+                  {/* Ngày tháng */}
+                  <div className="flex items-center gap-2 text-[#666] text-[13px] font-bold mb-4">
+                    <Calendar size={16} className="text-[#007d3d]" />
+                    <span>{formatVietnameseDate(date)}</span>
+                  </div>
+
+                  {/* Đường kẻ ngang */}
+                  <hr className="border-t border-[#e1e1e1] mb-6" />
+
+                  {/* Nội dung bài viết */}
+                  <article
+                    className="w-full text-[#333] text-[15px] leading-[1.8] text-justify
+                      [&>p]:mb-[15px] 
+                      [&>strong]:font-bold 
+                      [&>h2]:text-[18px] [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h2]:text-[#007d3d]
+                      [&>h3]:text-[16px] [&>h3]:font-bold [&>h3]:mb-2 [&>h3]:mt-4
+                      [&>img]:max-w-full [&>img]:h-auto [&>img]:mx-auto [&>img]:my-4 [&>img]:rounded-[4px]
+                      [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4
+                      [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                  />
                 </div>
-
-                {/* Đường kẻ ngang */}
-                <hr className="border-t border-[#e1e1e1] mb-6" />
-
-                {/* Nội dung bài viết */}
-                <article
-                  className="w-full text-[#333] text-[15px] leading-[1.8] text-justify
-                    [&>p]:mb-[15px] 
-                    [&>strong]:font-bold 
-                    [&>h2]:text-[18px] [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h2]:text-[#007d3d]
-                    [&>h3]:text-[16px] [&>h3]:font-bold [&>h3]:mb-2 [&>h3]:mt-4
-                    [&>img]:max-w-full [&>img]:h-auto [&>img]:mx-auto [&>img]:my-4 [&>img]:rounded-[4px]
-                    [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4
-                    [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                />
               </div>
             </div>
 
