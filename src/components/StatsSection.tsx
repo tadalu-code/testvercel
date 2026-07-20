@@ -1,13 +1,42 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
+interface StatItem { number: string; label: string; }
+
 export default function StatsSection() {
-  const statsData = [
-    { target: "15", suffix: " năm+", text: "Lĩnh vực thuốc bảo vệ thực vật" },
-    { target: "63", suffix: "/63", text: "Tỉnh thành có mặt trong hệ thống phân phối" },
-    { target: "2.000", suffix: "+", text: "Đại lý và điểm bán trên toàn quốc" },
-    { target: "500.000", suffix: "+", text: "Nông hộ đã và đang sử dụng sản phẩm" },
-    { target: "100", suffix: "+", text: "Sản phẩm đạt tiêu chuẩn chất lượng cao, an toàn với môi trường" },
+  const defaultStats = [
+    { number: "15 năm+", label: "Lĩnh vực thuốc bảo vệ thực vật" },
+    { number: "63/63", label: "Tỉnh thành có mặt trong hệ thống phân phối" },
+    { number: "2.000+", label: "Đại lý và điểm bán trên toàn quốc" },
+    { number: "500.000+", label: "Nông hộ đã và đang sử dụng sản phẩm" },
+    { number: "100+", label: "Sản phẩm đạt tiêu chuẩn chất lượng cao, an toàn với môi trường" },
   ];
+  const [statsData, setStatsData] = useState<StatItem[]>(defaultStats);
+  const [title, setTitle] = useState("Những con số đáng tự hào");
+
+  useEffect(() => {
+    fetch("/api/site-settings")
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (!data) return;
+        if (data.stats_title) setTitle(data.stats_title);
+        const loaded: StatItem[] = [1, 2, 3, 4, 5].map((i) => ({
+          number: data[`stat_${i}_number`] || defaultStats[i - 1].number,
+          label: data[`stat_${i}_label`] || defaultStats[i - 1].label,
+        }));
+        setStatsData(loaded);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Chuyển "15 năm+" → { target: "15", suffix: " năm+" } để giữ nguyên animation cũ
+  const parsed = statsData.map((s) => {
+    const match = s.number.match(/^([\d.,]+)(.*)/);
+    return match
+      ? { target: match[1], suffix: match[2], text: s.label }
+      : { target: s.number, suffix: "", text: s.label };
+  });
 
   return (
     // Đã giảm padding (py) và min-height trên mobile để không chiếm quá nhiều diện tích
@@ -68,12 +97,12 @@ export default function StatsSection() {
         
         {/* TIÊU ĐỀ ĐÃ DÙNG CLASS TÙY CHỈNH */}
         <h2 className="text-white text-[32px] md:text-[44px] font-[600] uppercase mb-10 md:mb-16 font-oswald-force drop-shadow-lg custom-title-spacing">
-          Những con số đáng tự hào
+          {title}
         </h2>
 
         {/* GRID: Giảm gap-x và gap-y trên mobile để vừa vặn 2 cột */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-2 sm:gap-x-4 lg:gap-x-6 gap-y-8 sm:gap-y-10 items-start">
-          {statsData.map((item, index) => (
+          {parsed.map((item, index) => (
             <div key={index} className={`flex flex-col items-center px-1 sm:px-2 ${
               // Item cuối (index 4) trên grid 2 cột sẽ bị lẻ — ận nó vào giữa
               index === 4 ? 'col-span-2 sm:col-span-1' : ''

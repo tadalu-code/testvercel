@@ -6,6 +6,9 @@ import Footer from "@/components/Footer";
 import ContactSection from "@/components/ContactSection";
 import FloatingContact from "@/components/FloatingContact";
 import AutoShowModal from '@/components/AutoShowModal';
+import ConditionalUI from '@/components/ConditionalUI';
+import { CartProvider } from '@/context/CartContext';
+import CartDrawer from '@/components/CartDrawer';
 
 import { getNavigation } from "@/services/api";
 
@@ -88,7 +91,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body 
-      
+        suppressHydrationWarning
         className={`${montserrat.className} min-h-screen flex flex-col bg-white antialiased`}
       >
         {/* THANH ĐIỀU HƯỚNG: 
@@ -96,18 +99,23 @@ export default async function RootLayout({
           Truyền dữ liệu navData vào đây để Navbar (Client Component) 
           hiển thị được menu mà không bị lỗi trắng trang.
         */}
-        <Navbar navData={navData} />
+        <CartProvider>
+          <Navbar navData={navData} />
+          <CartDrawer />
 
-        {/* NỘI DUNG CHÍNH */}
-        <main className="flex-grow">
-          {children}
-        </main>
+          {/* NỘI DUNG CHÍNH */}
+          <main className="flex-grow">
+            {children}
+          </main>
 
-        {/* CÁC PHẦN CUỐI TRANG */}
-        <ContactSection />
-        <FloatingContact />
-        <Footer navData={navData} />
-        <AutoShowModal />
+          {/* CÁC PHẦN CUỐI TRANG */}
+          <ConditionalUI>
+            <ContactSection />
+            <FloatingContact />
+            <AutoShowModal />
+            <Footer navData={navData} />
+          </ConditionalUI>
+        </CartProvider>
       </body>
     </html>
   );

@@ -154,23 +154,7 @@ export default async function PostDetailPage({ params }: Props) {
             </div>
 
             {/* BÌNH LUẬN */}
-            <div className="mb-10">
-              <h2 className="text-[#007d3d] text-[22px] font-bold mb-3">Bình luận</h2>
-              <p className="text-[15px] text-[#333]">
-                Nếu muốn bình luận cho bài viết này, bạn cần{' '}
-                <LoginButton /> !
-              </p>
-              {comments && comments.length > 0 && (
-                <div className="mt-6 flex flex-col gap-4">
-                  {comments.map((cmt: any) => (
-                    <div key={cmt.id} className="bg-gray-50 p-4 rounded-md border border-gray-100">
-                      <p className="font-bold text-sm text-[#007d3d]">{cmt.user_name || cmt.userName || "Khách"}</p>
-                      <p className="text-sm mt-1 text-gray-700">{cmt.content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+     
           </div>
 
           {/* CỘT PHẢI: BÀI VIẾT LIÊN QUAN */}

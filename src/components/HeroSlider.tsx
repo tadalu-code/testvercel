@@ -85,22 +85,49 @@
 //     </div>
 //   );
 // }
-
 "use client"; 
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
 
-export default function HeroSlider({ sectionsData }: { sectionsData: any[] }) {
-  
-  const bannerSections = sectionsData?.filter((s: any) => s.sectionType === 'banner') || [];
-  
-  const slides = bannerSections
-    .map((section: any) => section.content?.[0])
-    .filter((item: any) => item && item.imageUrl); 
+interface Slide { imageUrl: string; title?: string; }
 
+export default function HeroSlider({ sectionsData }: { sectionsData: any[] }) {
+  const [slides, setSlides] = useState<Slide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  useEffect(() => {
+    // Ưu tiên đọc banner từ site_settings (Admin quản lý)
+    fetch("/api/site-settings")
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data?.banner_images) {
+          try {
+            const imgs = JSON.parse(data.banner_images);
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              setSlides(imgs.map((img: any) => ({ imageUrl: img.url, title: img.title || "" })));
+              return;
+            }
+          } catch {}
+        }
+        // Fallback: dùng dữ liệu từ API cũ (sectionsData prop)
+        const bannerSections = sectionsData?.filter((s: any) => s.sectionType === 'banner') || [];
+        const fallback = bannerSections
+          .map((section: any) => section.content?.[0])
+          .filter((item: any) => item && item.imageUrl);
+        setSlides(fallback);
+      })
+      .catch(() => {
+        // Nếu lỗi mạng, dùng fallback
+        const bannerSections = sectionsData?.filter((s: any) => s.sectionType === 'banner') || [];
+        const fallback = bannerSections
+          .map((section: any) => section.content?.[0])
+          .filter((item: any) => item && item.imageUrl);
+        setSlides(fallback);
+      });
+  }, [sectionsData]);
+
+  // Auto-play
   useEffect(() => {
     if (!slides || slides.length === 0) return;
     const timer = setInterval(() => {

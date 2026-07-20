@@ -8,10 +8,22 @@
   --font-montserrat: var(--font-montserrat), sans-serif;
 }
 
-/* 2. RESET TOÀN CỤC */
+/* 2. RESET TOÀN CỤC & DARK MODE */
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* KHÔNG DÙNG !important ở đây để các class font chuyên biệt có thể hoạt động */

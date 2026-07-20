@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { getProductDetail, getProducts } from "@/services/api";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { X, ChevronLeft, ChevronRight, ZoomIn } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ZoomIn, Star } from "lucide-react";
 import RegisterModal from "@/components/RegisterModal";
+import ProductReviews from "@/components/ProductReviews";
 
 const parseImages = (urlStr: any) => {
   try {
@@ -240,21 +241,36 @@ export default function ProductDetailClient({ category, slug, initialProduct }: 
             >
               Thông số kỹ thuật
             </button>
+            <button
+              onClick={() => setActiveTab("danhgia")}
+              className={`flex-1 sm:flex-none px-10 py-3.5 font-medium text-[15px] text-center transition-all border-b-2 ${
+                activeTab === "danhgia"
+                  ? "text-[#007bff] border-[#007bff] bg-white"
+                  : "text-gray-500 border-transparent bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              Đánh giá
+            </button>
           </div>
 
-          <div className="py-8 text-[15px] text-gray-700 leading-relaxed min-h-[250px]">
-            {activeTab === "mota" ? (
-              <article
-                className="prose prose-slate max-w-none prose-img:rounded-md prose-img:mx-auto"
-                dangerouslySetInnerHTML={{ __html: product.content || "Đang cập nhật nội dung..." }}
-              />
-            ) : (
-              <div className="space-y-3">
-                <p>Tên thương mại: <b className="text-black font-medium">{product.name}</b></p>
-                <p>Danh mục: <b className="text-black font-medium">{product.category?.name || "Nông dược"}</b></p>
-              </div>
-            )}
-          </div>
+            <div className="py-8 text-[15px] text-gray-700 leading-relaxed min-h-[250px]">
+              {activeTab === "mota" ? (
+                <article
+                  className="prose prose-slate max-w-none prose-img:rounded-md prose-img:mx-auto whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ __html: product.description || "Đang cập nhật nội dung..." }}
+                />
+              ) : activeTab === "thongso" ? (
+                <div className="space-y-3 whitespace-pre-wrap">
+                  {product.specifications ? (
+                    <div dangerouslySetInnerHTML={{ __html: product.specifications }} />
+                  ) : (
+                    <p>Đang cập nhật thông số kỹ thuật...</p>
+                  )}
+                </div>
+              ) : (
+                <ProductReviews slug={slug} />
+              )}
+            </div>
         </div>
       </main>
 
