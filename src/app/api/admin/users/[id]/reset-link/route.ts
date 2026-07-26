@@ -4,10 +4,10 @@ import crypto from "crypto";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = params.id;
+    const { id } = await params;
 
     // TODO: Verify Admin Session here in a real app
     // Currently relying on middleware for /api/admin/*
@@ -18,7 +18,7 @@ export async function POST(
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const user = await prisma.user.update({
-      where: { id: userId },
+      where: { id },
       data: {
         resetPasswordToken: token,
         resetPasswordExpires: expires,

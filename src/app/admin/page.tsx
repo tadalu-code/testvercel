@@ -221,7 +221,7 @@ export default function AdminDashboard() {
                     ))}
                   </Pie>
                   <RechartsTooltip 
-                    formatter={(value: any, name: string) => [value + " đơn", STATUS_LABELS[name] || name]}
+                    formatter={(value: any, name: any) => [value + " đơn", STATUS_LABELS[name as string] || name]}
                   />
                   <Legend 
                     formatter={(value) => STATUS_LABELS[value] || value} 

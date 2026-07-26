@@ -5,7 +5,9 @@ import { CheckCircle, XCircle, ArrowRight, Home } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function VNPayReturnPage() {
+import { Suspense } from "react";
+
+function VNPayReturnContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   
@@ -73,5 +75,13 @@ export default function VNPayReturnPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VNPayReturnPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f6f8f5] flex items-center justify-center">Đang kiểm tra giao dịch...</div>}>
+      <VNPayReturnContent />
+    </Suspense>
   );
 }
