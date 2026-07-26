@@ -73,6 +73,8 @@ export const metadata: Metadata = {
   },
 };
 
+export const dynamic = 'force-dynamic';
+
 // 3. Hàm Layout duy nhất
 export default async function RootLayout({
   children,
