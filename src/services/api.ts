@@ -1,5 +1,7 @@
 // ======================= GIAO DIỆN CHUNG =======================
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL 
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 
+     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"));
 
 if (typeof window === 'undefined') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
