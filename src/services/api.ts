@@ -1,31 +1,8 @@
 // ======================= GIAO DIỆN CHUNG =======================
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-const BASE_URL_OLD = "https://api.nongduocmiennam.vn:5056/api";
 
 if (typeof window === 'undefined') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
-
-// Lấy Menu điều hướng
-export async function getNavigation() {
-  try {
-    const res = await fetch(`${BASE_URL_OLD}/navigation/public/shows`);
-    const data = await res.json();
-    return data?.data || [];
-  } catch (error) {
-    return [];
-  }
-}
-
-// Lấy dữ liệu các khối trên Trang chủ 
-export async function getHomePageSections() {
-  try {
-    const res = await fetch(`${BASE_URL_OLD}/page-section/public/shows?pageSlug=trang-chu`);
-    const data = await res.json();
-    return data?.data || [];
-  } catch (error) {
-    return [];
-  }
 }
 
 // ======================= BÀI VIẾT =======================
@@ -107,10 +84,10 @@ export async function getPostsByTopic(topicSlug: string, page: number = 1, limit
 
 export async function getPostComments(postId: number | string) {
   try {
-    const res = await fetch(`${BASE_URL_OLD}/comment/post/public/shows?ableId=${postId}`, { cache: 'no-store' });
+    const res = await fetch(`${BASE_URL}/api/comments?postId=${postId}`, { cache: 'no-store' });
     if (!res.ok) return [];
     const result = await res.json();
-    return result?.data?.data || result?.data || [];
+    return result?.data || [];
   } catch (error) {
     return [];
   }
@@ -118,7 +95,7 @@ export async function getPostComments(postId: number | string) {
 
 export async function getTopics() {
   try {
-    const res = await fetch(`${BASE_URL_OLD}/topic/public/shows`, { cache: "no-store" });
+    const res = await fetch(`${BASE_URL}/api/topics`, { cache: "no-store" });
     const result = await res.json();
     if (result?.data?.topics && Array.isArray(result.data.topics)) return result.data.topics;
     return result?.data || [];

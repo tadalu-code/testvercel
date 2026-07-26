@@ -1,26 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 
 export default function PasswordPage() {
-  const supabase = createClient();
+  const { data: session, status } = useSession();
   const [saving, setSaving] = useState(false);
+  const [hasPassword, setHasPassword] = useState(true);
+  const [loading, setLoading] = useState(true);
   
   const [form, setForm] = useState({
-    password: "",
+    old_password: "",
     new_password: "",
     confirm_password: "",
   });
 
   const [message, setMessage] = useState({ type: "", text: "" });
 
+  useEffect(() => {
+    async function loadUser() {
+      if (status === "loading") return;
+      if (session?.user) {
+        // Assume all users registered via our credentials flow have a password
+        // since we didn't implement OAuth logins for them yet (except Google if any)
+        // If they have no password in DB, our API will handle it. We can assume true for now.
+        setHasPassword(true);
+      }
+      setLoading(false);
+    }
+    loadUser();
+  }, [session, status]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage({ type: "", text: "" });
+
+    if (hasPassword && !form.old_password) {
+      setMessage({ type: "error", text: "Vui lòng nhập mật khẩu cũ." });
+      setSaving(false);
+      return;
+    }
 
     if (form.new_password.length < 6) {
       setMessage({ type: "error", text: "Mật khẩu mới phải có ít nhất 6 ký tự." });
@@ -35,14 +57,26 @@ export default function PasswordPage() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: form.new_password
+      const res = await fetch("/api/user/password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          old_password: form.old_password,
+          new_password: form.new_password
+        })
       });
 
-      if (error) throw error;
+      const data = await res.json();
       
-      setMessage({ type: "success", text: "Đổi mật khẩu thành công." });
-      setForm({ password: "", new_password: "", confirm_password: "" });
+      if (!res.ok) {
+        throw new Error(data.error || "Lỗi khi đổi mật khẩu.");
+      }
+      
+      setMessage({ type: "success", text: data.message });
+      setForm({ old_password: "", new_password: "", confirm_password: "" });
+      
     } catch (err: any) {
       console.error(err);
       setMessage({ type: "error", text: err.message || "Lỗi khi đổi mật khẩu." });
@@ -51,10 +85,12 @@ export default function PasswordPage() {
     }
   };
 
+  if (loading) return <div className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-[#00a651]" /></div>;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden min-h-[500px]">
       <div className="px-6 py-4 border-b border-gray-100">
-        <h1 className="text-xl font-medium text-gray-800">Đổi Mật Khẩu</h1>
+        <h1 className="text-xl font-medium text-gray-800">{hasPassword ? "Đổi Mật Khẩu" : "Thêm Mật Khẩu"}</h1>
         <p className="text-sm text-gray-500 mt-1">Để bảo mật tài khoản, vui lòng không chia sẻ mật khẩu cho người khác</p>
       </div>
 
@@ -66,6 +102,21 @@ export default function PasswordPage() {
         )}
 
         <form onSubmit={handleSave} className="max-w-2xl space-y-6">
+          {hasPassword && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+              <label className="w-40 text-sm text-gray-600 sm:text-right shrink-0">Mật khẩu cũ</label>
+              <div className="flex-1">
+                <input 
+                  type="password" 
+                  value={form.old_password} 
+                  onChange={e => setForm({...form, old_password: e.target.value})} 
+                  required={hasPassword}
+                  className="w-full bg-white px-4 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-[#00a651] focus:ring-1 focus:ring-[#00a651]" 
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <label className="w-40 text-sm text-gray-600 sm:text-right shrink-0">Mật khẩu mới</label>
             <div className="flex-1">

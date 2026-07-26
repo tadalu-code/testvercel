@@ -10,8 +10,8 @@ generator client {
 
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 
@@ -20,15 +20,29 @@ datasource db {
 // ============================================================
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
+  email         String?   @unique
+  password      String?
+  name          String?
+  emailVerified DateTime?
+  phone     String?   @unique
+  gender    String?
+  dob       DateTime?
+  avatarUrl String?
+  username  String?   @unique
   role      String   @default("admin") // admin, staff, user (nếu có khách hàng đăng nhập)
+  failedLoginAttempts Int @default(0) // Đếm số lần đăng nhập sai
+  lockoutUntil        DateTime?       // Thời điểm khóa tài khoản kết thúc
+  resetPasswordToken  String?         // Mã Token khôi phục mật khẩu
+  resetPasswordExpires DateTime?      // Hạn sử dụng mã Token
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   addresses UserAddress[]
   reviews   ProductReview[]
+  notifications Notification[]
+  accounts  Account[]
+  sessions  Session[]
+  wishlists Wishlist[]
 
   @@map("users")
 }
@@ -41,7 +55,7 @@ model Category {
   id          String    @id @default(cuid())
   name        String
   slug        String    @unique
-  description String?
+  description String?   @db.Text
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -59,14 +73,17 @@ model Product {
   id            String   @id @default(cuid())
   name          String
   slug          String   @unique
-  description   String?
-  imagesUrl     String[]
+  description   String?  @db.LongText
+  imagesUrl     Json     @default("[]")
   isPublished   Boolean  @default(true)
   price         Float?   // Giá gốc (VND)
   salePrice     Float?   // Giá khuyến mãi
   stock         Int      @default(0) // Số lượng tồn kho
   unit          String?  // Đơn vị: lít, kg, gói, chai...
-  technicalSpecs String? // Thông số kỹ thuật
+  technicalSpecs String? @db.LongText // Thông số kỹ thuật
+  metaTitle      String?
+  metaDescription String?
+  metaKeywords   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -77,6 +94,7 @@ model Product {
   // Quan hệ với OrderItem
   orderItems    OrderItem[]
   reviews       ProductReview[]
+  wishlists     Wishlist[]
 
   @@map("products")
 }
@@ -92,6 +110,8 @@ model Order {
   address       String
   note          String?
   totalAmount   Float
+  couponCode    String?
+  discountAmount Float?
   status        OrderStatus @default(PENDING)
   isCancelRequested Boolean @default(false)
   cancelReason  String?     // Lý do hủy đơn hàng
@@ -138,15 +158,48 @@ model OrderItem {
 // Quan hệ: 1 Topic → Nhiều Posts
 // ============================================================
 model Topic {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
 
   // Quan hệ 1-Nhiều với Post
   posts     Post[]
 
   @@map("topics")
+}
+
+// ============================================================
+// BẢNG: coupons — Mã giảm giá
+// ============================================================
+model Coupon {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  discountType      String   // "percentage" | "fixed"
+  discountValue     Float
+  minOrderValue     Float?
+  maxDiscountAmount Float?
+  startDate         DateTime?
+  endDate           DateTime?
+  usageLimit        Int?
+  usageCount        Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+// ============================================================
+// BẢNG: site_settings — Cài đặt website
+// ============================================================
+model SiteSetting {
+  key       String   @id
+  value     String?  @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
 }
 
 // ============================================================
@@ -158,8 +211,8 @@ model Post {
   title            String
   slug             String   @unique
   thumbnail        String?
-  content          String?  // Nội dung HTML full
-  shortDescription String?  // Mô tả ngắn hiển thị trên list
+  content          String?  @db.LongText // Nội dung HTML full
+  shortDescription String?  @db.Text // Mô tả ngắn hiển thị trên list
   isPublished      Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -167,6 +220,10 @@ model Post {
   // Khóa ngoại → topics
   topicId          String?
   topic            Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  metaTitle        String?
+  metaDescription  String?
+  metaKeywords     String?
 
   // Bình luận
   comments         Comment[]
@@ -179,8 +236,10 @@ model Post {
 // ============================================================
 model Comment {
   id        String   @id @default(cuid())
-  content   String
+  content   String   @db.Text
   author    String
+  likes     Int      @default(0)
+  avatarUrl String?
   createdAt DateTime @default(now())
 
   // Khóa ngoại → posts
@@ -198,7 +257,7 @@ model Contact {
   name        String
   phone       String?
   email       String?
-  content     String?
+  content     String?  @db.Text
   productName String?  // Tên sản phẩm quan tâm (từ modal liên hệ)
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -266,7 +325,7 @@ model UserAddress {
 // ============================================================
 model CancelReason {
   id        String   @id @default(cuid())
-  content   String
+  content   String   @db.Text
   createdAt DateTime @default(now())
 
   @@map("cancel_reasons")
@@ -282,10 +341,85 @@ model ProductReview {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   rating    Int      @default(5)
-  content   String?
-  imagesUrl String[] // Array of URLs
+  content   String?  @db.Text
+  imagesUrl Json     @default("[]") // Array of URLs
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("product_reviews")
+}
+
+// ============================================================
+// BẢNG: notifications — Thông báo người dùng
+// ============================================================
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String   @db.Text
+  type      String   // VD: "ORDER_STATUS", "COMMENT_REPLY", "STOCK_UPDATE"
+  linkUrl   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// ============================================================
+// NEXTAUTH MODELS
+// ============================================================
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ============================================================
+// BẢNG: wishlists — Sản phẩm Yêu thích
+// ============================================================
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlists")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }

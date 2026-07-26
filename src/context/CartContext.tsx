@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 
 export interface CartItem {
   id: string;
@@ -34,26 +34,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [cartKey, setCartKey] = useState("cart_guest");
 
+  const { data: session } = useSession();
+
   // Theo dõi trạng thái đăng nhập để lấy ID người dùng làm key lưu giỏ hàng
   useEffect(() => {
-    const supabase = createClient();
-    
-    // Lấy trạng thái ban đầu
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const userId = session?.user?.id;
-      setCartKey(userId ? `cart_${userId}` : "cart_guest");
-    });
-
-    // Lắng nghe thay đổi (đăng nhập/đăng xuất)
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const userId = session?.user?.id;
-      setCartKey(userId ? `cart_${userId}` : "cart_guest");
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+    const userId = (session?.user as any)?.id;
+    setCartKey(userId ? `cart_${userId}` : "cart_guest");
+  }, [session]);
 
   // Load giỏ hàng từ localStorage khi cartKey thay đổi (ví dụ: vừa đăng nhập xong)
   useEffect(() => {

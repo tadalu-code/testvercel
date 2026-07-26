@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
 
 // GET: Lấy tất cả settings (public)
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("site_settings")
-      .select("key, value");
-
-    if (error) throw error;
+    const data = await prisma.siteSetting.findMany({
+      select: { key: true, value: true }
+    });
 
     // Chuyển từ mảng [{key, value}] thành object {key: value} cho dễ dùng
     const settings: Record<string, string> = {};
@@ -28,17 +29,17 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     // body là object {key: value, key2: value2, ...}
-    const rows = Object.entries(body).map(([key, value]) => ({
-      key,
-      value: String(value),
-      updatedAt: new Date().toISOString(),
-    }));
+    
+    // Prisma does not have a direct upsertMany, so we use a transaction
+    const operations = Object.entries(body).map(([key, value]) => {
+      return prisma.siteSetting.upsert({
+        where: { key },
+        update: { value: String(value) },
+        create: { key, value: String(value) },
+      });
+    });
 
-    const { error } = await supabaseAdmin
-      .from("site_settings")
-      .upsert(rows, { onConflict: "key" });
-
-    if (error) throw error;
+    await prisma.$transaction(operations);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

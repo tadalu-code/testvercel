@@ -2,24 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, ClipboardList, Lock, UserCircle } from "lucide-react";
+import { User, ClipboardList, Lock, UserCircle, Heart } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 
 export default function UserSidebar() {
   const pathname = usePathname();
   const [avatarUrl, setAvatarUrl] = useState("");
   const [name, setName] = useState("");
 
+  const { data: session } = useSession();
+
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setAvatarUrl(data.user.user_metadata?.avatar_url || "");
-        setName(data.user.user_metadata?.name || "Tài khoản");
-      }
-    });
-  }, []);
+    if (session?.user) {
+      setAvatarUrl(session.user.image || "");
+      setName(session.user.name || "Tài khoản");
+    }
+  }, [session]);
 
   const navItems = [
     {
@@ -40,6 +39,15 @@ export default function UserSidebar() {
       match: "/user/account/purchase",
       subItems: [
         { title: "Thông tin đơn hàng", href: "/user/account/purchase" },
+      ],
+    },
+    {
+      title: "Sản Phẩm Yêu Thích",
+      icon: <Heart size={20} />,
+      href: "/user/account/wishlist",
+      match: "/user/account/wishlist",
+      subItems: [
+        { title: "Sản phẩm yêu thích", href: "/user/account/wishlist" },
       ],
     },
   ];

@@ -7,22 +7,20 @@ import ProductSection from "@/components/ProductSection";
 import RegisterSection from "@/components/RegisterSection";
 import PartnerSection from "@/components/PartnerSection";
 import ContactSection from "@/components/ContactSection";
-import { getProducts, getHomePageSections, getPost, getNavigation } from "@/services/api";
+import { getProducts, getPost } from "@/services/api";
 import Link from "next/link";
 
 export default async function Home() {
-  const [products, sectionsData, posts, navData] = await Promise.all([
+  const [products, posts] = await Promise.all([
     getProducts() || [],
-    getHomePageSections() || [],
-    getPost() || [],
-    getNavigation() || []
+    getPost() || []
   ]);
 
   return (
     <div className="bg-[#f4f4f4] min-h-screen flex flex-col font-sans text-gray-800">
 
       <main className="flex-grow">
-        <HeroSlider sectionsData={sectionsData} />
+        <HeroSlider sectionsData={[]} />
         <AboutSection />
         <StatsSection />
         <RegisterSection />

@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
 
-    let query = supabaseAdmin.from("topics").select("*").order("name", { ascending: true });
-
+    const where: Prisma.TopicWhereInput = {};
     if (search) {
-      query = query.ilike("name", `%${search}%`);
+      where.name = { contains: search };
     }
 
-    const { data: topics, error } = await query;
-
-    if (error) {
-      throw error;
-    }
+    const topics = await prisma.topic.findMany({
+      where,
+      orderBy: { name: "asc" }
+    });
 
     return NextResponse.json({ data: { topics } });
   } catch (error) {
@@ -34,22 +35,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu name hoặc slug" }, { status: 400 });
     }
 
-    const { data: topic, error } = await supabaseAdmin
-      .from("topics")
-      .insert([{ name, slug, description }])
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+    const topic = await prisma.topic.create({
+      data: {
+        name,
+        slug,
+        description: description || null
       }
-      throw error;
-    }
+    });
 
     return NextResponse.json({ data: topic }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[POST /api/topics]", error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 });
   }
 }

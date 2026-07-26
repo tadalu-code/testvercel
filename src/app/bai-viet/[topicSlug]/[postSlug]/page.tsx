@@ -1,9 +1,11 @@
 import { getPostDetail, getRelatedPosts, getPostComments } from "@/services/api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import LoginButton from "@/components/LoginButton";
 import { Home, Calendar } from "lucide-react";
+import PostComments from "@/components/PostComments";
 import { getBreadcrumbInfo, BreadcrumbData } from "@/utils/breadcrumb";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import type { Metadata } from "next";
 
 // ─── SEO: generateMetadata ────────────────────────────────────────────────────
@@ -81,6 +83,9 @@ export default async function PostDetailPage({ params }: Props) {
   const relatedPosts = await getRelatedPosts(topicSlug);
   const comments = post.id ? await getPostComments(post.id) : [];
 
+  const session = await getServerSession(authOptions);
+  const user = session?.user;
+
   const title = post.title || post.name || "Đang cập nhật tiêu đề";
   const content = post.content || post.description || post.body || "";
   const date = post.created_at || post.createdAt || post.published_at || new Date();
@@ -154,7 +159,7 @@ export default async function PostDetailPage({ params }: Props) {
             </div>
 
             {/* BÌNH LUẬN */}
-     
+            {post.id && <PostComments postId={post.id} user={user} />}
           </div>
 
           {/* CỘT PHẢI: BÀI VIẾT LIÊN QUAN */}

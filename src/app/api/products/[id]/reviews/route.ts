@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createClient } from "@/utils/supabase/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
@@ -13,17 +14,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const reviews = await prisma.productReview.findMany({
       where: { productId: product.id },
+      orderBy: { createdAt: "desc" },
       include: {
         user: {
           select: {
+            id: true,
             name: true,
+            email: true,
+            avatarUrl: true,
           }
         }
-      },
-      orderBy: { createdAt: "desc" }
+      }
     });
 
-    return NextResponse.json({ data: reviews });
+    const formattedReviews = reviews.map(r => ({
+      ...r,
+      user: {
+        name: r.user?.name || r.user?.email || "Khách hàng",
+        avatar_url: r.user?.avatarUrl || null
+      }
+    }));
+
+    return NextResponse.json({ data: formattedReviews });
   } catch (error: any) {
     console.error("[GET /api/products/[slug]/reviews]", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -32,12 +44,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getServerSession(authOptions);
     
-    if (!user) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const user = session.user as any;
 
     const resolvedParams = await params;
     const { id } = resolvedParams;

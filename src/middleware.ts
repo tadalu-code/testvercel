@@ -1,19 +1,29 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/utils/supabase/middleware";
+import { withAuth } from "next-auth/middleware";
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
-}
+export default withAuth({
+  callbacks: {
+    authorized: ({ req, token }) => {
+      const { pathname } = req.nextUrl;
+      
+      // Yêu cầu đăng nhập cho trang admin
+      if (pathname.startsWith("/admin")) {
+        return !!token && (token.role === "admin" || token.role === "staff");
+      }
+
+      // Yêu cầu đăng nhập cho trang user/account
+      if (pathname.startsWith("/user/account") || pathname.startsWith("/thanh-toan")) {
+        return !!token;
+      }
+
+      return true; // Cho phép truy cập các trang khác
+    },
+  },
+});
 
 export const config = {
   matcher: [
-    /*
-     * Áp dụng middleware cho tất cả routes trừ:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico, sitemap.xml, robots.txt
-     * - Các file public khác
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/admin/:path*",
+    "/user/account/:path*",
+    "/thanh-toan/:path*",
   ],
 };

@@ -7,8 +7,8 @@ interface Address {
   id: string;
   fullName: string;
   phone: string;
-  province: string;
-  commune: string;
+  province: any;
+  commune: any;
   detail: string;
   isDefault: boolean;
 }

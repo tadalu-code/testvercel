@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createClient } from "@/utils/supabase/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getServerSession(authOptions);
     
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = (session.user as any).id;
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const body = await request.json();
     const { fullName, phone, province, commune, detail, isDefault } = body;
 
@@ -20,14 +22,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       where: { id }
     });
 
-    if (!existing || existing.userId !== user.id) {
+    if (!existing || existing.userId !== userId) {
       return NextResponse.json({ error: "Not found or forbidden" }, { status: 404 });
     }
 
     // If setting as default, update all other addresses to not default
     if (isDefault && !existing.isDefault) {
       await prisma.userAddress.updateMany({
-        where: { userId: user.id },
+        where: { userId: userId },
         data: { isDefault: false }
       });
     }
@@ -37,8 +39,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       data: {
         fullName: fullName ?? existing.fullName,
         phone: phone ?? existing.phone,
-        province: province ? JSON.stringify(province) : existing.province,
-        commune: commune ? JSON.stringify(commune) : existing.commune,
+        province: province ? JSON.stringify({ code: province.code, name: province.name }) : existing.province,
+        commune: commune ? JSON.stringify({ code: commune.code, name: commune.name }) : existing.commune,
         detail: detail ?? existing.detail,
         isDefault: isDefault ?? existing.isDefault
       }
@@ -51,22 +53,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getServerSession(authOptions);
     
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = (session.user as any).id;
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
 
     const existing = await prisma.userAddress.findUnique({
       where: { id }
     });
 
-    if (!existing || existing.userId !== user.id) {
+    if (!existing || existing.userId !== userId) {
       return NextResponse.json({ error: "Not found or forbidden" }, { status: 404 });
     }
 
@@ -77,7 +80,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     // If we deleted the default address, make the newest remaining address the default
     if (existing.isDefault) {
       const remaining = await prisma.userAddress.findFirst({
-        where: { userId: user.id },
+        where: { userId: userId },
         orderBy: { createdAt: "desc" }
       });
 

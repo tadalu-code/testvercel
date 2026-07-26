@@ -1,0 +1,328 @@
+﻿// ============================================================
+// PRISMA SCHEMA — Nông Dược Miền Nam
+// Database: PostgreSQL (Supabase)
+// Tài liệu: https://pris.ly/d/prisma-schema
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider  = "mysql"
+  url       = env("DATABASE_URL")
+}
+
+
+// ============================================================
+// BẢNG: users — Tài khoản Admin
+// ============================================================
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin") // admin, staff, user (nếu có khách hàng đăng nhập)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses UserAddress[]
+  reviews   ProductReview[]
+
+  @@map("users")
+}
+
+// ============================================================
+// BẢNG: categories — Danh mục Sản phẩm
+// Quan hệ: 1 Category → Nhiều Products
+// ============================================================
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Quan hệ 1-Nhiều với Product
+  products    Product[]
+
+  @@map("categories")
+}
+
+// ============================================================
+// BẢNG: products — Sản phẩm
+// Quan hệ: Nhiều Products → 1 Category (khóa ngoại)
+// ============================================================
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  imagesUrl     Json     @default("[]")
+  isPublished   Boolean  @default(true)
+  price         Float?   // Giá gốc (VND)
+  salePrice     Float?   // Giá khuyến mãi
+  stock         Int      @default(0) // Số lượng tồn kho
+  unit          String?  // Đơn vị: lít, kg, gói, chai...
+  technicalSpecs String? // Thông số kỹ thuật
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Khóa ngoại → categories
+  categoryId    String?
+  category      Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Quan hệ với OrderItem
+  orderItems    OrderItem[]
+  reviews       ProductReview[]
+
+  @@map("products")
+}
+
+// ============================================================
+// BẢNG: orders — Đơn hàng
+// ============================================================
+model Order {
+  id            String      @id @default(cuid())
+  userId        String?     // null = khách vãng lai
+  fullName      String
+  phone         String
+  address       String
+  note          String?
+  totalAmount   Float
+  status        OrderStatus @default(PENDING)
+  isCancelRequested Boolean @default(false)
+  cancelReason  String?     // Lý do hủy đơn hàng
+  paymentMethod String      @default("COD") // COD | VNPAY
+  paymentStatus String      @default("UNPAID") // UNPAID | PAID
+  couponCode    String?
+  discountAmount Float      @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items         OrderItem[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING    // Chờ xác nhận
+  CONFIRMED  // Đã xác nhận
+  SHIPPING   // Đang giao hàng
+  DELIVERED  // Đã giao hàng
+  COMPLETED  // Đã hoàn thành (User đã nhận)
+  CANCELLED  // Đã hủy
+}
+
+// ============================================================
+// BẢNG: order_items — Chi tiết sản phẩm trong đơn hàng
+// ============================================================
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  price     Float   // Giá tại thời điểm mua (snapshot)
+  name      String  // Tên sản phẩm tại thời điểm mua (snapshot)
+
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+}
+
+
+// ============================================================
+// BẢNG: topics — Chuyên mục Bài viết
+// Quan hệ: 1 Topic → Nhiều Posts
+// ============================================================
+model Topic {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  // Quan hệ 1-Nhiều với Post
+  posts     Post[]
+
+  @@map("topics")
+}
+
+// ============================================================
+// BẢNG: posts — Bài viết / Tin tức
+// Quan hệ: Nhiều Posts → 1 Topic (khóa ngoại)
+// ============================================================
+model Post {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  thumbnail        String?
+  content          String?  // Nội dung HTML full
+  shortDescription String?  // Mô tả ngắn hiển thị trên list
+  isPublished      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Khóa ngoại → topics
+  topicId          String?
+  topic            Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  // Bình luận
+  comments         Comment[]
+
+  @@map("posts")
+}
+
+// ============================================================
+// BẢNG: comments — Bình luận bài viết
+// ============================================================
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  author    String
+  createdAt DateTime @default(now())
+
+  // Khóa ngoại → posts
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// ============================================================
+// BẢNG: contacts — Tin nhắn Liên hệ
+// ============================================================
+model Contact {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  content     String?
+  productName String?  // Tên sản phẩm quan tâm (từ modal liên hệ)
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("contacts")
+}
+
+// ============================================================
+// BẢNG: navigation — Menu điều hướng
+// Quan hệ: Self-referencing (menu cha → menu con)
+// ============================================================
+model Navigation {
+  id       String       @id @default(cuid())
+  title    String
+  url      String
+  order    Int          @default(0)
+  isActive Boolean      @default(true)
+
+  // Self-referencing: menu cha - menu con
+  parentId String?
+  parent   Navigation?  @relation("NavChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children Navigation[] @relation("NavChildren")
+
+  @@map("navigation")
+}
+
+// ============================================================
+// BẢNG: page_sections — Các khối nội dung trang chủ (Hero slider, v.v.)
+// ============================================================
+model PageSection {
+  id          String   @id @default(cuid())
+  pageSlug    String   // Ví dụ: "trang-chu"
+  sectionType String   // Ví dụ: "hero", "banner", "promo"
+  title       String?
+  imageUrl    String?
+  linkUrl     String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("page_sections")
+}
+
+// ============================================================
+// BẢNG: user_addresses — Sổ địa chỉ giao hàng
+// ============================================================
+model UserAddress {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName  String
+  phone     String
+  province  String   // Lưu JSON string hoặc name: VD: {"code": "01", "name": "Hà Nội"} hoặc "Hà Nội"
+  commune   String   // Lưu JSON string hoặc name
+  detail    String   // Số nhà, tên đường
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_addresses")
+}
+
+// ============================================================
+// BẢNG: cancel_reasons — Lý do hủy đơn hàng (do admin quản lý)
+// ============================================================
+model CancelReason {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  @@map("cancel_reasons")
+}
+
+// ============================================================
+// BẢNG: product_reviews — Đánh giá sản phẩm
+// ============================================================
+model ProductReview {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int      @default(5)
+  content   String?
+  imagesUrl Json     @default("[]") // Array of URLs
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("product_reviews")
+}
+
+// ============================================================
+// BẢNG: coupons — Mã giảm giá
+// ============================================================
+model Coupon {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  discountType      String    // PERCENTAGE | FIXED
+  discountValue     Float
+  minOrderValue     Float?
+  maxDiscountAmount Float?
+  usageLimit        Int?
+  usedCount         Int       @default(0)
+  startDate         DateTime?
+  endDate           DateTime?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("coupons")
+}
+
+ / /   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+ / /   B �N G :   s i t e _ s e t t i n g s      C � i   �t   w e b s i t e 
+ / /   = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+ m o d e l   S i t e S e t t i n g   { 
+     k e y               S t r i n g       @ i d 
+     v a l u e           S t r i n g ?     @ d b . T e x t 
+     u p d a t e d A t   D a t e T i m e   @ u p d a t e d A t 
+ 
+     @ @ m a p ( " s i t e _ s e t t i n g s " ) 
+ } 
+ 
+ 
+ 

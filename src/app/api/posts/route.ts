@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,29 +16,33 @@ export async function GET(request: NextRequest) {
     
     const skip = (page - 1) * limit;
 
-    let query: any = supabaseAdmin
-      .from("posts")
-      .select("*, topic:topics!inner(*)", { count: "exact" })
-      .order("createdAt", { ascending: false })
-      .range(skip, skip + limit - 1);
+    const where: Prisma.PostWhereInput = {};
 
     if (search) {
-      query = query.ilike("title", `%${search}%`);
+      where.title = { contains: search };
     }
 
     if (topicSlug && topicSlug !== 'all') {
-      query = query.eq("topic.slug", topicSlug);
+      where.topic = { slug: topicSlug };
     }
 
     if (isPublished !== undefined) {
-      query = query.eq("isPublished", isPublished);
+      where.isPublished = isPublished;
     }
 
-    const { data: posts, count, error } = await query;
-    if (error) throw error;
+    const [posts, totalItems] = await Promise.all([
+      prisma.post.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: { topic: true }
+      }),
+      prisma.post.count({ where })
+    ]);
 
     return NextResponse.json({
-      data: { posts: posts || [], totalItems: count || 0, page, limit },
+      data: { posts, totalItems, page, limit },
     });
   } catch (error) {
     console.error("[GET /api/posts]", error);
@@ -52,35 +59,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu tiêu đề hoặc slug" }, { status: 400 });
     }
 
-    const insertData: any = {
-      title,
-      slug,
-      shortDescription,
-      content,
-      thumbnail,
-      topicId: topicId || null,
-      isPublished: isPublished ?? true,
-      metaTitle: metaTitle || null,
-      metaDescription: metaDescription || null,
-      metaKeywords: metaKeywords || null,
-    };
-
-    const { data: post, error } = await supabaseAdmin
-      .from("posts")
-      .insert(insertData)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+    const post = await prisma.post.create({
+      data: {
+        title,
+        slug,
+        shortDescription,
+        content,
+        thumbnail,
+        topicId: topicId || null,
+        isPublished: isPublished ?? true,
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+        metaKeywords: metaKeywords || null,
       }
-      throw error;
-    }
+    });
 
     return NextResponse.json({ data: post }, { status: 201 });
   } catch (error: any) {
     console.error("[POST /api/posts]", error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Lỗi tạo bài viết" }, { status: 500 });
   }
 }

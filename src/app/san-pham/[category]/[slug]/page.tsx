@@ -31,20 +31,23 @@ export async function generateMetadata({
   }
 
   const name = product.name || "Sản phẩm";
-  const title = `${name} | Nông Dược Miền Nam`;
+  const finalTitle = product.metaTitle ? { absolute: product.metaTitle } : name;
   const description =
-    product.short_description ||
+    product.metaDescription ||
     product.description ||
     `Mua ${name.toLowerCase()} chính hãng tại Nông Dược Miền Nam — chuyên cung cấp thuốc bảo vệ thực vật trên toàn quốc.`;
+  const keywords = product.metaKeywords ? product.metaKeywords.split(',').map((k: string) => k.trim()) : undefined;
+  
   const canonicalUrl = `https://nongduocmiennam.vn/san-pham/${category}/${slug}`;
   const ogImage = parseFirstImage(product.imagesUrl) ?? "https://nongduocmiennam.vn/logo512.png";
 
   return {
-    title,
+    title: finalTitle,
     description,
+    keywords,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title,
+      title: typeof finalTitle === 'string' ? finalTitle : finalTitle.absolute,
       description,
       url: canonicalUrl,
       siteName: "Nông Dược Miền Nam",

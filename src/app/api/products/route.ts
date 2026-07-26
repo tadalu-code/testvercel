@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,34 +14,39 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
     
-    let query = supabaseAdmin
-      .from("products")
-      .select("*, category:categories(*)", { count: "exact" })
-      .eq("isPublished", true)
-      .order("createdAt", { ascending: false })
-      .range(skip, skip + limit - 1);
+    const where: Prisma.ProductWhereInput = {
+      isPublished: true,
+    };
 
     if (categorySlug && categorySlug !== "tat-ca") {
-      // Find category first to get its ID, or filter by category relation
-      query = query.eq("categories.slug", categorySlug);
+      where.category = {
+        slug: categorySlug
+      };
     }
 
     if (search) {
-      query = query.ilike("name", `%${search}%`);
+      where.name = {
+        contains: search
+      };
     }
 
-    const { data: products, count: totalItems, error } = await query;
-
-    if (error) throw error;
-
-    // Supabase returns related objects as an array if not 1:1, but here it's 1:1 so it's an object or null, but we need to filter out products where category doesn't match if we filtered
-    let finalProducts = products;
-    if (categorySlug && categorySlug !== "tat-ca") {
-       finalProducts = products?.filter(p => p.category !== null) || [];
-    }
+    const [products, totalItems] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc'
+        },
+        include: {
+          category: true
+        }
+      }),
+      prisma.product.count({ where })
+    ]);
 
     return NextResponse.json({
-      data: { products: finalProducts, totalItems: totalItems || 0, page, limit },
+      data: { products, totalItems, page, limit },
     });
   } catch (error) {
     console.error("[GET /api/products]", error);
@@ -55,14 +63,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu tên hoặc slug" }, { status: 400 });
     }
 
-    const { data: product, error } = await supabaseAdmin
-      .from("products")
-      .insert([{
-        id: crypto.randomUUID(),
+    const product = await prisma.product.create({
+      data: {
         name,
         slug,
         description: description || "",
-        specifications: technicalSpecs || null,
+        technicalSpecs: technicalSpecs || null,
         imagesUrl: imagesUrl || [],
         categoryId: categoryId || null,
         isPublished: isPublished ?? true,
@@ -73,21 +79,18 @@ export async function POST(request: NextRequest) {
         metaTitle: metaTitle || null,
         metaDescription: metaDescription || null,
         metaKeywords: metaKeywords || null,
-        updatedAt: new Date().toISOString()
-      }])
-      .select("*, category:categories(*)")
-      .single();
-
-    if (error) {
-      if (error.code === "23505") { // Unique violation
-        return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+      },
+      include: {
+        category: true
       }
-      throw error;
-    }
+    });
 
     return NextResponse.json({ data: product }, { status: 201 });
   } catch (error: any) {
     console.error("[POST /api/products]", error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: "Slug đã tồn tại" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Lỗi tạo sản phẩm" }, { status: 500 });
   }
 }

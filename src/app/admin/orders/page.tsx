@@ -43,14 +43,13 @@ export default function AdminOrdersPage() {
 
   const fetchOrders = async () => {
     setLoading(true);
-    const q = filter !== "ALL" ? `?status=${filter}` : "";
-    const res = await fetch(`/api/orders${q}`);
+    const res = await fetch(`/api/orders`);
     const data = await res.json();
     setOrders(data.data?.orders || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchOrders(); }, [filter]);
+  useEffect(() => { fetchOrders(); }, []);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -119,6 +118,10 @@ export default function AdminOrdersPage() {
   const processedOrders = useMemo(() => {
     let result = [...orders];
 
+    if (filter !== "ALL") {
+      result = result.filter(o => o.status === filter);
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(o => 
@@ -144,7 +147,7 @@ export default function AdminOrdersPage() {
     }
 
     return result;
-  }, [orders, searchQuery, dateFilter, sortPrice]);
+  }, [orders, filter, searchQuery, dateFilter, sortPrice]);
 
   const totalPages = Math.ceil(processedOrders.length / ITEMS_PER_PAGE);
   const paginatedOrders = processedOrders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -168,43 +171,43 @@ export default function AdminOrdersPage() {
   const renderActionButtons = (order: any) => {
     if (order.isCancelRequested && order.status !== "CANCELLED") {
       return (
-        <div className="flex gap-2 w-full flex-col">
+        <>
           <button
             onClick={(e) => { e.stopPropagation(); handleCancelResponse(order, "APPROVE"); }}
             disabled={updating === order.id}
-            className="w-full py-1.5 px-2 bg-red-600 text-white border border-red-600 text-[12px] font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+            className="px-3 py-1.5 bg-red-600 text-white border border-red-600 text-[12px] font-semibold rounded-md hover:bg-red-700 transition-colors disabled:opacity-60"
           >
             Đồng ý hủy
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleCancelResponse(order, "REJECT"); }}
             disabled={updating === order.id}
-            className="w-full px-3 py-1.5 text-gray-600 border border-gray-300 text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 bg-white"
+            className="px-3 py-1.5 text-gray-700 border border-gray-300 text-[12px] font-semibold rounded-md hover:bg-gray-50 transition-colors disabled:opacity-60 bg-white"
           >
-            Từ chối hủy
+            Từ chối
           </button>
-        </div>
+        </>
       );
     }
 
     if (order.status === "PENDING") {
       return (
-        <div className="flex gap-2 w-full">
+        <>
           <button
             onClick={(e) => { e.stopPropagation(); setConfirmModalOrder(order); }}
             disabled={updating === order.id}
-            className="flex-1 py-1.5 px-2 bg-blue-600 text-white border border-blue-600 text-[12px] font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
+            className="px-6 py-1.5 bg-blue-600 text-white border border-blue-600 text-[12px] font-semibold rounded-md hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm"
           >
             Xác nhận
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleCancel(order); }}
             disabled={updating === order.id}
-            className="px-3 py-1.5 text-red-600 border border-red-200 text-[12px] font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60 bg-white"
+            className="px-4 py-1.5 text-red-600 border border-red-200 text-[12px] font-semibold rounded-md hover:bg-red-50 transition-colors disabled:opacity-60 bg-white"
           >
             Hủy
           </button>
-        </div>
+        </>
       );
     }
     if (order.status === "CONFIRMED") {
@@ -212,7 +215,7 @@ export default function AdminOrdersPage() {
         <button
           onClick={(e) => { e.stopPropagation(); handleStatusChange(order, "SHIPPING"); }}
           disabled={updating === order.id}
-          className="w-full py-1.5 px-2 bg-purple-600 text-white border border-purple-600 text-[12px] font-semibold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
+          className="px-6 py-1.5 bg-purple-600 text-white border border-purple-600 text-[12px] font-semibold rounded-md hover:bg-purple-700 transition-colors disabled:opacity-60 shadow-sm"
         >
           Xác nhận giao
         </button>
@@ -223,14 +226,14 @@ export default function AdminOrdersPage() {
         <button
           onClick={(e) => { e.stopPropagation(); handleStatusChange(order, "DELIVERED"); }}
           disabled={updating === order.id}
-          className="w-full py-1.5 px-2 bg-[#00a651] text-white border border-[#00a651] text-[12px] font-semibold rounded-lg hover:bg-[#009040] transition-colors disabled:opacity-60"
+          className="px-6 py-1.5 bg-[#00a651] text-white border border-[#00a651] text-[12px] font-semibold rounded-md hover:bg-[#009040] transition-colors disabled:opacity-60 shadow-sm"
         >
           Đã giao
         </button>
       );
     }
     if (order.status === "DELIVERED") {
-      return <div className="text-[12px] text-gray-500 font-medium italic w-full text-center py-1.5">Chờ khách xác nhận đã nhận...</div>;
+      return <div className="text-[12px] text-gray-500 font-medium italic">Chờ khách nhận hàng...</div>;
     }
     return null;
   };
@@ -238,7 +241,7 @@ export default function AdminOrdersPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Đơn hàng</h1>
           <p className="text-sm text-gray-500 mt-0.5">{processedOrders.length} đơn hàng</p>
@@ -260,7 +263,7 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Search & Sort Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col md:flex-row gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input 
@@ -354,6 +357,11 @@ export default function AdminOrdersPage() {
                               <Icon size={14} />
                               {st.label}
                             </span>
+                            {order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID' && (
+                              <span className="text-[#028046] text-[11px] font-bold bg-[#028046]/10 border border-[#028046]/20 px-2 py-0.5 rounded">
+                                ĐÃ THANH TOÁN
+                              </span>
+                            )}
                             {order.isCancelRequested && order.status !== "CANCELLED" && (
                               <span className="text-red-600 text-[11px] font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded animate-pulse">
                                 ⚠️ Yêu cầu hủy
@@ -361,7 +369,14 @@ export default function AdminOrdersPage() {
                             )}
                           </div>
                         </div>
-                        <p className="text-[13px] text-gray-600 mt-1 font-medium">{order.fullName}</p>
+                        <p className="text-[13px] text-gray-600 mt-1 font-medium">
+                          {order.fullName}
+                          {order.account && (
+                            <span className="ml-2 text-[11px] bg-[#028046]/10 text-[#028046] px-1.5 py-0.5 rounded-full inline-block">
+                              👤 {order.account.name || 'Thành viên'}: {order.account.email}
+                            </span>
+                          )}
+                        </p>
                         <p className="text-[12px] text-gray-400">{order.phone}</p>
                         <p className="text-[12px] text-gray-400 truncate max-w-[280px]">{order.address}</p>
                         {order.status === "CANCELLED" && order.cancelReason && (
@@ -376,15 +391,13 @@ export default function AdminOrdersPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex gap-2 mt-3 items-center">
-                      <div className="flex-1 flex gap-2">
-                        {renderActionButtons(order)}
-                      </div>
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100 items-center justify-end">
+                      {renderActionButtons(order)}
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelected(isActive ? null : order); }}
-                        className="px-3 py-1.5 text-gray-500 border border-gray-200 text-[12px] rounded-lg hover:bg-gray-50 transition-colors h-[32px] flex items-center justify-center shrink-0 bg-white"
+                        className="px-2.5 py-1.5 text-gray-600 border border-gray-300 text-[12px] rounded-md hover:bg-gray-50 transition-colors h-[30px] flex items-center justify-center shrink-0 bg-white shadow-sm"
                       >
-                        <Eye size={13} />
+                        <Eye size={14} />
                       </button>
                     </div>
                   </div>
@@ -414,7 +427,18 @@ export default function AdminOrdersPage() {
 
             {/* Thông tin khách */}
             <div className="space-y-1.5 text-[13px]">
-              <div className="flex gap-2"><span className="text-gray-400 w-24 shrink-0">Khách hàng:</span><span className="font-medium text-gray-800">{selected.fullName}</span></div>
+              <div className="flex gap-2">
+                <span className="text-gray-400 w-24 shrink-0">Người nhận:</span>
+                <span className="font-medium text-gray-800">{selected.fullName}</span>
+              </div>
+              {selected.account && (
+                <div className="flex gap-2">
+                  <span className="text-gray-400 w-24 shrink-0">Tài khoản đặt:</span>
+                  <span className="font-medium text-[#028046]">
+                    {selected.account.name || 'Thành viên'} - {selected.account.email}
+                  </span>
+                </div>
+              )}
               <div className="flex gap-2"><span className="text-gray-400 w-24 shrink-0">Điện thoại:</span><span className="text-gray-700">{selected.phone}</span></div>
               <div className="flex gap-2"><span className="text-gray-400 w-24 shrink-0">Địa chỉ:</span><span className="text-gray-700">{selected.address}</span></div>
               {selected.note && <div className="flex gap-2"><span className="text-gray-400 w-24 shrink-0">Ghi chú:</span><span className="text-gray-700 italic">{selected.note}</span></div>}
@@ -428,6 +452,11 @@ export default function AdminOrdersPage() {
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${STATUS_MAP[selected.status]?.color}`}>
                   {STATUS_MAP[selected.status]?.label}
                 </span>
+                {selected.paymentMethod !== 'COD' && selected.paymentStatus === 'PAID' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-[#028046] bg-[#028046]/10 border border-[#028046]/20">
+                    ĐÃ THANH TOÁN
+                  </span>
+                )}
               </div>
               {selected.status === "CANCELLED" && selected.cancelReason && (
                  <div className="flex gap-2 mt-2"><span className="text-red-400 text-[13px] w-24 shrink-0">Lý do hủy:</span><span className="text-red-600 text-[13px]">{selected.cancelReason}</span></div>
@@ -451,9 +480,21 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Tổng */}
-            <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-[15px]">
-              <span>Tổng cộng</span>
-              <span className="text-[#028046]">{formatPrice(selected.totalAmount)}</span>
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <div className="flex justify-between text-[13px] text-gray-600">
+                <span>Phí vận chuyển</span>
+                <span>{formatPrice(30000)}</span>
+              </div>
+              {selected.couponCode && (
+                <div className="flex justify-between text-[13px] text-green-600">
+                  <span>Mã giảm giá ({selected.couponCode})</span>
+                  <span>-{formatPrice(selected.discountAmount || 0)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-[15px] pt-2 border-t border-dashed border-gray-100">
+                <span>Tổng cộng</span>
+                <span className="text-[#028046]">{formatPrice(selected.totalAmount)}</span>
+              </div>
             </div>
 
             {/* Đổi trạng thái (Action Buttons in Detail pane) */}

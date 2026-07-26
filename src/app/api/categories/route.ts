@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { data: categories, error } = await supabaseAdmin
-      .from("categories")
-      .select("*, products(count)")
-      .order("name", { ascending: true });
-
-    if (error) throw error;
-
-    const formattedCategories = categories?.map((cat: any) => ({
-      ...cat,
-      _count: {
-        products: cat.products?.[0]?.count || 0
+    const categories = await prisma.category.findMany({
+      include: {
+        _count: {
+          select: { products: true }
+        }
       },
-      products: undefined // remove the raw products array
-    }));
+      orderBy: {
+        name: 'asc'
+      }
+    });
 
-    return NextResponse.json(formattedCategories);
+    return NextResponse.json(categories);
   } catch (error) {
     console.error("[GET /api/categories] Error:", error);
     return NextResponse.json(
@@ -32,23 +30,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { name, slug, description } = body;
-    const crypto = require('crypto');
-    const id = crypto.randomUUID();
 
-    const { data: category, error } = await supabaseAdmin
-      .from("categories")
-      .insert([{ 
-        id, 
-        name, 
-        slug, 
+    const category = await prisma.category.create({
+      data: {
+        name,
+        slug,
         description,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
+      }
+    });
 
     return NextResponse.json(category, { status: 201 });
   } catch (error: any) {

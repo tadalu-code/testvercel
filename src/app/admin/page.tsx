@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, FileText, Tag, MessageSquare, TrendingUp, Download } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Package, FileText, Tag, MessageSquare, TrendingUp, Download, ShoppingBag, DollarSign, CheckCircle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import * as XLSX from "xlsx";
 
 interface Stats {
@@ -11,32 +11,58 @@ interface Stats {
   totalCategories: number;
   totalContacts: number;
   unreadContacts: number;
+  pendingOrders: number;
 }
 
 interface Analytics {
+  totalRevenue: number;
+  totalOrders: number;
   revenueChart: { date: string; revenue: number }[];
   topCustomers: { email: string; name: string; totalSpent: number; totalOrders: number }[];
   topProducts: { id: string; name: string; quantitySold: number; revenue: number }[];
+  statusDistribution: { name: string; value: number }[];
 }
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "#eab308", 
+  CONFIRMED: "#3b82f6", 
+  SHIPPING: "#a855f7", 
+  DELIVERED: "#14b8a6", 
+  COMPLETED: "#22c55e", 
+  CANCELLED: "#ef4444", 
+};
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Chờ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  SHIPPING: "Đang giao",
+  DELIVERED: "Đã giao",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+};
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [daysFilter, setDaysFilter] = useState("30");
+
   useEffect(() => {
-    Promise.all([
-      fetch("/api/stats").then((r) => r.json()),
-      fetch("/api/analytics").then((r) => r.json())
-    ]).then(([statsRes, analyticsRes]) => {
-      setStats(statsRes.data);
-      setAnalytics(analyticsRes.data);
+    fetch("/api/stats").then((r) => r.json()).then((res) => {
+      setStats(res.data);
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/analytics?days=${daysFilter}`).then((r) => r.json()).then((res) => {
+      setAnalytics(res.data);
       setLoading(false);
     }).catch((err) => {
       console.error(err);
       setLoading(false);
     });
-  }, []);
+  }, [daysFilter]);
 
   const exportRevenue = () => {
     if (!analytics?.revenueChart) return;
@@ -56,24 +82,35 @@ export default function AdminDashboard() {
   const cards = [
     { label: "Sản phẩm", value: stats?.totalProducts ?? 0, icon: Package, color: "from-blue-500 to-blue-600", bg: "bg-blue-50", href: "/admin/products" },
     { label: "Bài viết", value: stats?.totalPosts ?? 0, icon: FileText, color: "from-purple-500 to-purple-600", bg: "bg-purple-50", href: "/admin/posts" },
-    { label: "Danh mục", value: stats?.totalCategories ?? 0, icon: Tag, color: "from-orange-500 to-orange-600", bg: "bg-orange-50", href: "/admin/categories" },
+    { label: "Đơn hàng mới", value: stats?.pendingOrders ?? 0, icon: ShoppingBag, color: "from-orange-500 to-orange-600", bg: "bg-orange-50", href: "/admin/orders" },
     { label: "Liên hệ mới", value: stats?.unreadContacts ?? 0, icon: MessageSquare, color: "from-green-500 to-emerald-600", bg: "bg-green-50", href: "/admin/contacts" },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 sm:gap-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
           <p className="text-gray-500 text-sm mt-1">Tổng quan hệ thống & Báo cáo doanh thu</p>
         </div>
-        <button
-          onClick={exportRevenue}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
-        >
-          <Download size={16} /> Xuất doanh thu (Excel)
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <select 
+            value={daysFilter} 
+            onChange={(e) => setDaysFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-xl bg-white text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-medium"
+          >
+            <option value="7">7 ngày qua</option>
+            <option value="30">30 ngày qua</option>
+            <option value="365">1 năm qua</option>
+          </select>
+          <button
+            onClick={exportRevenue}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+          >
+            <Download size={16} /> Xuất Excel
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -103,31 +140,97 @@ export default function AdminDashboard() {
         })}
       </div>
 
-      {/* Revenue Chart */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <h2 className="font-semibold text-gray-800 mb-4">Doanh thu 30 ngày qua</h2>
-        <div className="h-[300px] w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-[#028046] to-emerald-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <DollarSign size={80} />
+          </div>
+          <p className="text-emerald-100 font-medium mb-1">Tổng doanh thu ({daysFilter} ngày)</p>
           {loading ? (
-            <div className="w-full h-full bg-gray-50 animate-pulse rounded-xl" />
+            <div className="h-10 w-40 bg-white/20 rounded animate-pulse" />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics?.revenueChart || []} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#888' }}
-                  tickFormatter={(value) => `${value / 1000000}M`}
-                />
-                <Tooltip 
-                  formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: '#333', fontWeight: 'bold' }}
-                />
-                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            <h3 className="text-4xl font-bold tracking-tight">{formatCurrency(analytics?.totalRevenue || 0)}</h3>
           )}
+        </div>
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <CheckCircle size={80} />
+          </div>
+          <p className="text-blue-100 font-medium mb-1">Đơn hàng thành công ({daysFilter} ngày)</p>
+          {loading ? (
+            <div className="h-10 w-24 bg-white/20 rounded animate-pulse" />
+          ) : (
+            <h3 className="text-4xl font-bold tracking-tight">{analytics?.totalOrders || 0} đơn</h3>
+          )}
+        </div>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Chart */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 lg:col-span-2">
+          <h2 className="font-semibold text-gray-800 mb-4">Biểu đồ doanh thu</h2>
+          <div className="h-[300px] w-full">
+            {loading ? (
+              <div className="w-full h-full bg-gray-50 animate-pulse rounded-xl" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analytics?.revenueChart || []} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 12, fill: '#888' }}
+                    tickFormatter={(value) => `${value / 1000000}M`}
+                  />
+                  <RechartsTooltip 
+                    formatter={(value: any) => formatCurrency(value || 0)}
+                    labelStyle={{ color: '#333', fontWeight: 'bold' }}
+                    cursor={{ fill: '#f8fafc' }}
+                  />
+                  <Bar dataKey="revenue" fill="#028046" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Order Status PieChart */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h2 className="font-semibold text-gray-800 mb-4">Tỷ lệ trạng thái đơn hàng</h2>
+          <div className="h-[300px] w-full flex items-center justify-center">
+            {loading ? (
+              <div className="w-48 h-48 bg-gray-50 rounded-full animate-pulse" />
+            ) : !analytics?.statusDistribution?.length ? (
+              <p className="text-gray-400">Chưa có dữ liệu</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analytics.statusDistribution}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {analytics.statusDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || '#cbd5e1'} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    formatter={(value: any, name: string) => [value + " đơn", STATUS_LABELS[name] || name]}
+                  />
+                  <Legend 
+                    formatter={(value) => STATUS_LABELS[value] || value} 
+                    iconType="circle"
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
 

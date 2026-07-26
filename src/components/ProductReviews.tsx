@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Star, MessageCircle, Send, Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 
 interface Review {
   id: string;
@@ -12,6 +11,7 @@ interface Review {
   createdAt: string;
   user: {
     name: string;
+    avatar_url?: string;
   };
 }
 
@@ -55,6 +55,7 @@ export default function ProductReviews({ slug }: { slug: string }) {
     const newImages: string[] = [];
 
     try {
+      const { createClient } = await import('@/utils/supabase/client');
       const supabase = createClient();
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -117,7 +118,7 @@ export default function ProductReviews({ slug }: { slug: string }) {
       if (!res.ok) {
         setError(data.error || "Có lỗi xảy ra");
       } else {
-        setForm({ rating: 5, content: "" });
+        setForm({ rating: 5, content: "", imagesUrl: [] });
         fetchReviews();
       }
     } catch (err: any) {
@@ -243,8 +244,12 @@ export default function ProductReviews({ slug }: { slug: string }) {
               <div key={review.id} className="border-b border-gray-100 pb-5 last:border-0">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500 uppercase">
-                      {review.user?.name ? review.user.name.charAt(0) : "U"}
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500 uppercase overflow-hidden shrink-0">
+                      {review.user?.avatar_url ? (
+                        <img src={review.user.avatar_url} alt={review.user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        review.user?.name ? review.user.name.charAt(0) : "U"
+                      )}
                     </div>
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{review.user?.name || "Khách hàng"}</p>

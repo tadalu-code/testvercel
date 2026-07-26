@@ -1,51 +1,75 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
+import ReCAPTCHA from "react-google-recaptcha";
+import RegisterModal from "@/components/RegisterModal";
 
 export default function LoginPage() {
   const router = useRouter();
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [requireV2, setRequireV2] = useState(false);
+  const [recaptchaTokenV2, setRecaptchaTokenV2] = useState<string | null>(null);
+
+  // Forgot password modal state
+  const [showForgotPassModal, setShowForgotPassModal] = useState(false);
 
   const handleGoogleLogin = async () => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${location.origin}/admin`,
-      },
-    });
+    signIn("google", { callbackUrl: "/" });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (requireV2 && !recaptchaTokenV2) {
+      setError("Vui lòng xác nhận bạn không phải người máy");
+      return;
+    }
+
+    if (!executeRecaptcha) {
+      setError("Hệ thống chống spam chưa sẵn sàng, vui lòng thử lại sau.");
+      return;
+    }
+
     setLoading(true);
     setError("");
-
-    const supabase = createClient();
     
-    // Nếu người dùng nhập số điện thoại hoặc tên đăng nhập (không chứa @)
-    // Ta tự động thêm đuôi @nongduoc.vn để hợp lệ với Supabase Auth
-    const authEmail = email.includes("@") ? email : `${email}@nongduoc.vn`;
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: authEmail,
+    const recaptchaToken = await executeRecaptcha("login_submit");
+    
+    const res = await signIn("credentials", {
+      redirect: false,
+      email: email,
       password,
+      recaptchaToken: recaptchaToken || "",
+      recaptchaTokenV2: recaptchaTokenV2 || "",
     });
 
-    if (authError) {
-      setError("Email hoặc mật khẩu không hợp lệ");
+    if (res?.error) {
+      if (res.error === "REQUIRE_V2_CAPTCHA") {
+        setRequireV2(true);
+        setError("Bạn đã nhập sai nhiều lần. Vui lòng xác minh Captcha để tiếp tục.");
+      } else {
+        setError(res.error);
+        if (requireV2) {
+          // Reset the captcha token so they have to solve it again on next try
+          setRecaptchaTokenV2(null);
+          recaptchaRef.current?.reset();
+        }
+      }
       setLoading(false);
       return;
     }
 
-    router.push("/admin");
+    router.push("/");
     router.refresh();
   };
 
@@ -120,6 +144,17 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              {/* ReCAPTCHA v2 */}
+              {requireV2 && (
+                <div className="flex justify-center my-3">
+                  <ReCAPTCHA
+                    ref={recaptchaRef}
+                    sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_V2_SITE_KEY || ""}
+                    onChange={(token) => setRecaptchaTokenV2(token)}
+                  />
+                </div>
+              )}
+
               {/* Button */}
               <button
                 type="submit"
@@ -130,7 +165,7 @@ export default function LoginPage() {
               </button>
               
               <div className="flex justify-between items-center text-[12px] text-blue-600 mt-3">
-                <Link href="#" className="hover:text-blue-700">Quên mật khẩu</Link>
+                <button type="button" onClick={() => setShowForgotPassModal(true)} className="hover:text-blue-700">Quên mật khẩu</button>
                 <Link href="#" className="hover:text-blue-700">Đăng nhập với SMS</Link>
               </div>
             </form>
@@ -166,6 +201,14 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Quên Mật Khẩu */}
+      <RegisterModal
+        isOpen={showForgotPassModal}
+        onClose={() => setShowForgotPassModal(false)}
+        title="YÊU CẦU CẤP LẠI MẬT KHẨU"
+        defaultSubject="YÊU CẦU CẤP LẠI MẬT KHẨU"
+      />
     </div>
   );
 }

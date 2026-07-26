@@ -9,8 +9,9 @@ import AutoShowModal from '@/components/AutoShowModal';
 import ConditionalUI from '@/components/ConditionalUI';
 import { CartProvider } from '@/context/CartContext';
 import CartDrawer from '@/components/CartDrawer';
-
-import { getNavigation } from "@/services/api";
+import { Toaster } from 'react-hot-toast';
+import NextAuthSessionProvider from "@/components/NextAuthSessionProvider";
+import ReCaptchaProvider from "@/components/ReCaptchaProvider";
 
 // 1. Khởi tạo các Font
 const inter = Inter({ 
@@ -81,8 +82,8 @@ export default async function RootLayout({
 
 
   
-  // Lấy dữ liệu navigation ở Server Side
-  const navData = await getNavigation() || [];
+  // Lấy dữ liệu navigation ở Server Side (Removed as we use hardcoded menu)
+  const navData: any[] = [];
 
   return (
     <html 
@@ -99,23 +100,28 @@ export default async function RootLayout({
           Truyền dữ liệu navData vào đây để Navbar (Client Component) 
           hiển thị được menu mà không bị lỗi trắng trang.
         */}
-        <CartProvider>
-          <Navbar navData={navData} />
-          <CartDrawer />
+        <NextAuthSessionProvider>
+          <ReCaptchaProvider>
+            <CartProvider>
+              <Navbar navData={navData} />
+              <CartDrawer />
 
-          {/* NỘI DUNG CHÍNH */}
-          <main className="flex-grow">
-            {children}
-          </main>
+              {/* NỘI DUNG CHÍNH */}
+              <main className="flex-grow">
+                {children}
+              </main>
 
-          {/* CÁC PHẦN CUỐI TRANG */}
-          <ConditionalUI>
-            <ContactSection />
-            <FloatingContact />
-            <AutoShowModal />
-            <Footer navData={navData} />
-          </ConditionalUI>
-        </CartProvider>
+              {/* CÁC PHẦN CUỐI TRANG */}
+              <ConditionalUI>
+                <ContactSection />
+                <FloatingContact />
+                <AutoShowModal />
+                <Footer navData={navData} />
+              </ConditionalUI>
+            </CartProvider>
+          </ReCaptchaProvider>
+        </NextAuthSessionProvider>
+        <Toaster position="bottom-right" />
       </body>
     </html>
   );

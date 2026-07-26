@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { ChevronDown, Search, ShoppingCart, LogOut, User, ShoppingBag, Shield } from 'lucide-react';
+import { ChevronDown, Search, ShoppingCart, LogOut, User, ShoppingBag, Shield, Bell, Heart } from 'lucide-react';
 import Link from "next/link";
 import { usePathname, useRouter } from 'next/navigation';
 import MobileMenu from "./MobileMenu";
 import RegisterModal from "./RegisterModal";
-import { createClient } from '@/utils/supabase/client';
+import { useSession, signOut } from "next-auth/react";
 import { useCart } from '@/context/CartContext';
+import NotificationDropdown from "./NotificationDropdown";
 
 const PRODUCT_MAP: Record<string, string> = {
   "phân bón": "phan-bon",
@@ -35,7 +36,8 @@ function getAvatarColor(email: string): string {
 
 export default function Navbar({ navData }: { navData: any[] }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { data: session, status } = useSession();
+  const user = session?.user as any;
   const { totalItems, openCart } = useCart();
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
@@ -49,12 +51,6 @@ export default function Navbar({ navData }: { navData: any[] }) {
   const [workingHours, setWorkingHours] = useState('Sáng: 7h30 - 11h30 Chiều: 13h30 - 17h00');
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
     fetch('/api/site-settings')
       .then(res => res.json())
       .then(({ data }) => {
@@ -62,8 +58,6 @@ export default function Navbar({ navData }: { navData: any[] }) {
         if (data?.working_hours) setWorkingHours(data.working_hours);
       })
       .catch(() => {});
-
-    return () => subscription.unsubscribe();
   }, []);
 
   // Đóng dropdown khi click ra ngoài
@@ -90,9 +84,7 @@ export default function Navbar({ navData }: { navData: any[] }) {
   }, []);
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
+    await signOut({ redirect: false });
     setShowDropdown(false);
     router.push('/');
     router.refresh();
@@ -161,15 +153,14 @@ export default function Navbar({ navData }: { navData: any[] }) {
   const mainMenu = HARDCODED_MENU;
 
   const email = user?.email || '';
-  const meta = user?.user_metadata || {};
-  const isFakeEmail = email.endsWith("@nongduoc.vn");
-  const defaultUsername = isFakeEmail ? email.replace("@nongduoc.vn", "") : "";
+  const username = user?.username || '';
+  const phone = user?.phone || '';
   
-  // Ưu tiên: Tên đăng nhập > Tên đầy đủ từ Google > Username tự nhập > Fallback email
-  const displayName = meta.username || meta.full_name || meta.name || defaultUsername || getDisplayName(email);
+  // Ưu tiên: Tên đầy đủ > Tên đăng nhập > SĐT > Fallback email
+  const displayName = user?.name || username || phone || getDisplayName(email);
   
-  const avatarUrl = meta.avatar_url;
-  const bgColor = getAvatarColor(email || 'default');
+  const avatarUrl = user?.image;
+  const bgColor = getAvatarColor(email || username || phone || 'default');
   const initials = displayName ? displayName.charAt(0).toUpperCase() : 'U';
 
   // Phần nút auth — render trực tiếp, không dùng nested component
@@ -190,6 +181,9 @@ export default function Navbar({ navData }: { navData: any[] }) {
 
     return (
       <div className={wrapClass}>
+        {/* Thông báo */}
+        <NotificationDropdown isMobile={isMobile} />
+
         {/* Giỏ hàng */}
         <button onClick={openCart} className="relative hover:text-yellow-300 transition-colors">
           <ShoppingCart size={isMobile ? 17 : 20} />
@@ -249,7 +243,14 @@ export default function Navbar({ navData }: { navData: any[] }) {
           >
             <ShoppingBag size={14} /> Đơn hàng
           </Link>
-          {(user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'staff') && (
+          <Link
+            href="/user/account/wishlist"
+            onClick={() => setShowDropdown(false)}
+            className="flex items-center gap-2 px-4 py-2.5 text-[13px] hover:bg-gray-50 hover:text-[#028046] transition-colors"
+          >
+            <Heart size={14} /> Yêu thích
+          </Link>
+          {(user?.role === 'admin' || user?.role === 'staff') && (
             <Link
               href="/admin"
               onClick={() => setShowDropdown(false)}
@@ -269,7 +270,7 @@ export default function Navbar({ navData }: { navData: any[] }) {
 
       {/* --- TOPBAR DESKTOP --- */}
       <div
-        className="w-full text-white py-3.5 lg:min-h-[50px] hidden lg:flex items-center relative z-40"
+        className="w-full text-white py-3.5 lg:min-h-[50px] hidden lg:flex items-center relative z-[60]"
         style={{ backgroundImage: 'linear-gradient(rgb(99, 216, 89), rgb(2, 128, 70))' }}
       >
         <div className="max-w-[1340px] w-full mx-auto px-4 lg:px-6">
@@ -301,7 +302,7 @@ export default function Navbar({ navData }: { navData: any[] }) {
 
       {/* --- TOPBAR MOBILE --- */}
       <div
-        className="lg:hidden w-full text-white px-4 py-2.5 flex flex-col gap-2"
+        className="lg:hidden w-full text-white px-4 py-2.5 flex flex-col gap-2 relative z-[60]"
         style={{ backgroundImage: 'linear-gradient(rgb(99, 216, 89), rgb(2, 128, 70))' }}
       >
         <div className="flex flex-col gap-1">

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Package,
@@ -18,12 +18,14 @@ import {
   ShoppingBag,
   Users,
   Monitor,
+  Ticket,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/products", label: "Sản phẩm", icon: Package },
   { href: "/admin/orders", label: "Đơn hàng", icon: ShoppingBag },
+  { href: "/admin/coupons", label: "Mã giảm giá", icon: Ticket },
   { href: "/admin/posts", label: "Bài viết", icon: FileText },
   { href: "/admin/categories", label: "Danh mục sản phẩm", icon: Tag },
   { href: "/admin/contacts", label: "Liên hệ", icon: MessageSquare },
@@ -39,20 +41,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loggingOut, setLoggingOut] = useState(false);
   const [userRole, setUserRole] = useState<string>("admin");
 
+  const { data: session } = useSession();
+
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserRole(data.user.user_metadata?.role || "admin");
-      }
-    });
-  }, []);
+    if (session?.user) {
+      setUserRole((session.user as any).role || "admin");
+    }
+  }, [session]);
 
   const visibleNavItems = navItems.filter((item) => {
     if (userRole === "staff") {
       return [
         "/admin/products", 
         "/admin/orders", 
+        "/admin/coupons",
         "/admin/posts", 
         "/admin/contacts", 
         "/admin/settings"
@@ -63,8 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut({ redirect: false });
     router.push("/auth/login");
   };
 
@@ -156,21 +157,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
-            <span>Admin</span>
+          <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400 min-w-0 flex-1">
+            <span className="hidden sm:inline">Admin</span>
             {currentPage && (
               <>
-                <ChevronRight size={14} />
-                <span className="text-gray-800 dark:text-gray-200 font-medium">{currentPage.label}</span>
+                <ChevronRight size={14} className="hidden sm:block shrink-0" />
+                <span className="text-gray-800 dark:text-gray-200 font-medium truncate">{currentPage.label}</span>
               </>
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 shrink-0">
             <Link
               href="/"
               target="_blank"
-              className="text-[12px] text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg hover:border-green-300"
+              className="text-[12px] text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg hover:border-green-300 whitespace-nowrap"
             >
               Xem trang chủ 
             </Link>

@@ -4,7 +4,7 @@ import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ShoppingBag, ArrowLeft, CheckCircle, Truck, Phone, MapPin, User, Loader2, BookMarked } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price);
@@ -16,6 +16,17 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [orderId, setOrderId] = useState("");
+  
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [discountInfo, setDiscountInfo] = useState<{
+    code: string;
+    discountType: string;
+    discountValue: number;
+    discountAmount: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -30,27 +41,33 @@ export default function CheckoutPage() {
   const [selectedProvince, setSelectedProvince] = useState<{code: string, name: string} | null>(null);
   const [selectedCommune, setSelectedCommune] = useState<{code: string, name: string} | null>(null);
 
+  const [paymentMethod, setPaymentMethod] = useState("COD");
+
+
   const [userAddresses, setUserAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const { data: session } = useSession();
 
   useEffect(() => {
     fetch("https://production.cas.so/address-kit/latest/provinces")
       .then(res => res.json())
       .then(data => setProvinces(data.provinces || []))
       .catch(console.error);
+  }, []);
 
-    const fetchUserAndAddresses = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      const user = session?.user as any;
       if (user) {
         try {
           // Fallback to user metadata if no address book
           setForm(prev => ({
             ...prev,
-            fullName: user.user_metadata?.name || prev.fullName,
-            phone: user.user_metadata?.phone || prev.phone,
+            fullName: user.name || prev.fullName,
+            phone: user.phone || prev.phone,
           }));
 
           const res = await fetch("/api/user/addresses");
@@ -81,8 +98,10 @@ export default function CheckoutPage() {
         }
       }
     };
-    fetchUserAndAddresses();
-  }, []);
+    if (session?.user) {
+      fetchAddresses();
+    }
+  }, [session]);
 
   useEffect(() => {
     if (selectedProvince) {
@@ -108,6 +127,50 @@ export default function CheckoutPage() {
     }
   }, [selectedProvince]);
 
+  // Recalculate discount if cart changes
+  useEffect(() => {
+    if (discountInfo) {
+      applyCoupon(discountInfo.code);
+    }
+  }, [totalAmount]);
+
+  const applyCoupon = async (codeToApply = couponCode) => {
+    if (!codeToApply.trim()) {
+      setCouponError("Vui lòng nhập mã giảm giá");
+      return;
+    }
+    
+    setIsApplyingCoupon(true);
+    setCouponError("");
+    
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: codeToApply, cartTotal: totalAmount }),
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setDiscountInfo(data.data);
+      } else {
+        setCouponError(data.error || "Mã không hợp lệ");
+        setDiscountInfo(null);
+      }
+    } catch (err) {
+      setCouponError("Lỗi kết nối");
+      setDiscountInfo(null);
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponCode("");
+    setDiscountInfo(null);
+    setCouponError("");
+  };
+
   const handleSelectAddress = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
     setSelectedAddressId(id);
@@ -127,7 +190,12 @@ export default function CheckoutPage() {
 
   const isCanTho = selectedProvince?.name.toLowerCase().includes("cần thơ") || selectedProvince?.name.toLowerCase().includes("can tho");
   const shippingFee = selectedProvince ? (isCanTho ? 0 : 30000) : 0;
-  const finalTotal = totalAmount + shippingFee;
+  
+  let finalTotal = totalAmount + shippingFee;
+  if (discountInfo) {
+    finalTotal -= discountInfo.discountAmount;
+  }
+  if (finalTotal < 0) finalTotal = 0;
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -160,11 +228,22 @@ export default function CheckoutPage() {
           address: fullAddress,
           note: form.note,
           items: items.map((i: any) => ({ productId: i.id || i.productId || i._id, quantity: i.quantity })),
+          couponCode: discountInfo ? discountInfo.code : null,
+          discountAmount: discountInfo ? discountInfo.discountAmount : 0,
+          paymentMethod
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Lỗi đặt hàng");
+      
       clearCart();
+
+      // Nếu là VNPay thì redirect
+      if (paymentMethod === "VNPAY" && data.vnpUrl) {
+        window.location.href = data.vnpUrl;
+        return;
+      }
+
       setOrderId(data.data.id);
       setSuccess(true);
     } catch (error: any) {
@@ -388,13 +467,35 @@ export default function CheckoutPage() {
               <h2 className="font-bold text-gray-800 text-[16px] mb-4 flex items-center gap-2">
                 <Truck size={18} className="text-[#028046]" /> Phương thức thanh toán
               </h2>
-              <label className="flex items-center gap-3 p-4 border-2 border-[#028046] rounded-xl bg-green-50 cursor-pointer">
-                <input type="radio" name="payment" defaultChecked className="accent-[#028046]" />
-                <div>
-                  <p className="font-semibold text-[14px] text-gray-800">Thanh toán khi nhận hàng (COD)</p>
-                  <p className="text-[12px] text-gray-400 mt-0.5">Trả tiền mặt khi nhận được hàng</p>
-                </div>
-              </label>
+              <div className="space-y-3">
+                <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'COD' ? 'border-[#028046] bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input 
+                    type="radio" 
+                    name="payment" 
+                    checked={paymentMethod === 'COD'}
+                    onChange={() => setPaymentMethod('COD')}
+                    className="accent-[#028046] w-4 h-4" 
+                  />
+                  <div>
+                    <p className="font-semibold text-[14px] text-gray-800">Thanh toán khi nhận hàng (COD)</p>
+                    <p className="text-[12px] text-gray-400 mt-0.5">Trả tiền mặt khi nhận được hàng</p>
+                  </div>
+                </label>
+                
+                <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'VNPAY' ? 'border-[#028046] bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input 
+                    type="radio" 
+                    name="payment" 
+                    checked={paymentMethod === 'VNPAY'}
+                    onChange={() => setPaymentMethod('VNPAY')}
+                    className="accent-[#028046] w-4 h-4" 
+                  />
+                  <div>
+                    <p className="font-semibold text-[14px] text-gray-800">Thanh toán VNPay</p>
+                    <p className="text-[12px] text-gray-400 mt-0.5">Thanh toán online an toàn qua ví VNPay hoặc thẻ ngân hàng</p>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {/* Nút đặt hàng (mobile) */}
@@ -446,12 +547,59 @@ export default function CheckoutPage() {
                   <span>Tạm tính</span>
                   <span>{formatPrice(totalAmount)}</span>
                 </div>
+                
+                {/* Coupon UI */}
+                <div className="py-2">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Mã giảm giá" 
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      disabled={!!discountInfo || isApplyingCoupon}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-[13px] uppercase focus:outline-none focus:border-[#028046]"
+                    />
+                    {!discountInfo ? (
+                      <button 
+                        type="button"
+                        onClick={() => applyCoupon()}
+                        disabled={isApplyingCoupon || !couponCode.trim()}
+                        className="px-4 py-2 bg-gray-800 text-white rounded-lg text-[13px] font-medium disabled:opacity-50"
+                      >
+                        {isApplyingCoupon ? "..." : "Áp dụng"}
+                      </button>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={removeCoupon}
+                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[13px] font-medium"
+                      >
+                        Hủy
+                      </button>
+                    )}
+                  </div>
+                  {couponError && <p className="text-red-500 text-[12px] mt-1">{couponError}</p>}
+                  {discountInfo && (
+                    <p className="text-[#028046] text-[12px] mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} /> Áp dụng thành công
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-between text-[13px] text-gray-500">
                   <span>Phí vận chuyển</span>
                   <span className={shippingFee === 0 ? "text-green-600 font-medium" : "text-gray-800"}>
                     {selectedProvince ? (shippingFee === 0 ? "Miễn phí" : formatPrice(shippingFee)) : "Chọn địa chỉ"}
                   </span>
                 </div>
+                
+                {discountInfo && (
+                  <div className="flex justify-between text-[13px] text-[#028046]">
+                    <span>Giảm giá</span>
+                    <span>-{formatPrice(discountInfo.discountAmount)}</span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between font-bold text-[16px] text-gray-800 pt-2 border-t border-gray-100">
                   <span>Tổng cộng</span>
                   <span className="text-[#e74c3c]">{formatPrice(finalTotal)}</span>

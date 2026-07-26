@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,15 +11,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "Vai trò không hợp lệ" }, { status: 400 });
     }
 
-    const { data: user, error } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      user_metadata: { role }
+    const user = await prisma.user.update({
+      where: { id },
+      data: { role }
     });
 
-    if (error) throw error;
-
-    return NextResponse.json({ message: "Cập nhật thành công", data: user.user });
-  } catch (error) {
+    return NextResponse.json({ message: "Cập nhật thành công", data: user });
+  } catch (error: any) {
     console.error("[PATCH /api/users/[id]]", error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Lỗi cập nhật vai trò người dùng" }, { status: 500 });
   }
 }

@@ -64,7 +64,7 @@ export default function AdminCategoriesPage() {
   const paginatedCategories = categories.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Danh mục</h1>
@@ -72,7 +72,7 @@ export default function AdminCategoriesPage() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
         >
           <Plus size={16} /> Thêm danh mục
         </button>
@@ -80,7 +80,7 @@ export default function AdminCategoriesPage() {
 
       {/* Add form */}
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-orange-100 p-5 space-y-4 shadow-sm">
+        <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-blue-100 p-5 space-y-4 shadow-sm">
           <h3 className="font-semibold text-gray-800">Tạo danh mục mới</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>

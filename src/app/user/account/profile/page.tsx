@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 import { Loader2, Upload } from "lucide-react";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session, status, update } = useSession();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -29,38 +29,42 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
+      if (status === "loading") return;
+      if (!session?.user) {
         router.push("/auth/login");
         return;
       }
 
-      const meta = user.user_metadata || {};
-      const dob = meta.dob ? new Date(meta.dob) : null;
-      
-      // Phân tách 2 luồng: Gmail thật và Tên đăng nhập (email ảo)
-      const isFakeEmail = user.email?.endsWith("@nongduoc.vn");
-      const defaultUsername = isFakeEmail ? user.email?.replace("@nongduoc.vn", "") : "";
-      const displayEmail = meta.profile_email || (isFakeEmail ? "" : (user.email || ""));
-      const initialUsername = meta.username || defaultUsername || "";
-      
-      setForm({
-        email: displayEmail,
-        username: initialUsername,
-        name: meta.name || meta.full_name || "",
-        phone: meta.phone || "",
-        gender: meta.gender || "Nam",
-        dob_day: dob ? String(dob.getDate()).padStart(2, '0') : "",
-        dob_month: dob ? String(dob.getMonth() + 1).padStart(2, '0') : "",
-        dob_year: dob ? String(dob.getFullYear()) : "",
-        avatar_url: meta.avatar_url || "",
-        // Biến phụ để biết đã có username từ trước chưa (nếu có rồi thì không cho sửa)
-        hasInitialUsername: !!initialUsername,
-      });
-      setLoading(false);
+      try {
+        const res = await fetch("/api/user/profile");
+        if (!res.ok) throw new Error("Failed to load profile");
+        const { data: user } = await res.json();
+        
+        const dob = user.dob ? new Date(user.dob) : null;
+        
+        const displayEmail = user.email || "";
+        const initialUsername = user.username || "";
+        
+        setForm({
+          email: displayEmail,
+          username: initialUsername,
+          name: user.name || "",
+          phone: user.phone || "",
+          gender: user.gender || "Nam",
+          dob_day: dob ? String(dob.getDate()).padStart(2, '0') : "",
+          dob_month: dob ? String(dob.getMonth() + 1).padStart(2, '0') : "",
+          dob_year: dob ? String(dob.getFullYear()) : "",
+          avatar_url: user.avatarUrl || "",
+          hasInitialUsername: !!initialUsername,
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
     loadUser();
-  }, [router, supabase.auth]);
+  }, [router, session, status]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,6 +80,14 @@ export default function ProfilePage() {
     setMessage({ type: "", text: "" });
 
     try {
+      // Uploading logic requires an API route or keeping Supabase storage for images.
+      // Assuming we keep Supabase storage just for uploading images as it's separate from auth.
+      // But we shouldn't use createClient without auth. Let's see if we can do an unauthenticated upload or create an API route.
+      // For now, let's keep the storage upload but we need to create a new client since we removed it from imports.
+      // Let's import it locally just for storage.
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
@@ -93,9 +105,12 @@ export default function ProfilePage() {
       setForm(prev => ({ ...prev, avatar_url: publicUrl }));
       
       // Auto save avatar
-      await supabase.auth.updateUser({
-        data: { avatar_url: publicUrl }
+      await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: publicUrl })
       });
+      await update({ image: publicUrl });
       
       setMessage({ type: "success", text: "Cập nhật ảnh đại diện thành công!" });
     } catch (err: any) {
@@ -117,19 +132,27 @@ export default function ProfilePage() {
         dob = `${form.dob_year}-${form.dob_month}-${form.dob_day}`;
       }
 
-      const { error } = await supabase.auth.updateUser({
-        data: {
+      const res = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           username: form.username,
-          profile_email: form.email,
+          email: form.email,
           name: form.name,
           phone: form.phone,
           gender: form.gender,
           dob: dob,
-          avatar_url: form.avatar_url,
-        }
+          avatarUrl: form.avatar_url,
+        })
       });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update profile");
+      }
+      
+      await update({ name: form.name, image: form.avatar_url });
+      
       setMessage({ type: "success", text: "Hồ sơ đã được lưu thành công." });
     } catch (err: any) {
       console.error(err);

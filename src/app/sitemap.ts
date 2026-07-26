@@ -8,7 +8,7 @@ function toDateOnly(date?: string | Date): string {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://nongduocmiennam.vn'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nongduocmiennam.vn'
 
   // 1. TRANG TĨNH
   const staticPages: MetadataRoute.Sitemap = [
@@ -72,7 +72,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     productPages = products
       .filter((p: any) => p.slug)
       .map((p: any) => ({
-        url: `${baseUrl}/san-pham/${p.category_slug || 'tat-ca'}/${p.slug}`,
+        url: `${baseUrl}/san-pham/${p.category?.slug || 'danh-muc'}/${p.slug}`,
         lastModified: toDateOnly(p.updated_at || p.created_at),
         changeFrequency: 'monthly' as const,
         priority: 0.6,

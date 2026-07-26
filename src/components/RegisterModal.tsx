@@ -7,12 +7,16 @@ interface RegisterModalProps {
   onClose: () => void;
   title?: string;
   productName?: string;
+  defaultSubject?: string;
 }
 
-export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH ĐƯỢC HỖ TRỢ QUÝ KHÁCH", productName }: RegisterModalProps) {
+import { toast } from 'react-hot-toast';
+
+export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH ĐƯỢC HỖ TRỢ QUÝ KHÁCH", productName, defaultSubject }: RegisterModalProps) {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', subject: '', message: '' });
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
   // THÊM: State lưu lỗi số điện thoại
   const [phoneError, setPhoneError] = useState('');
 
@@ -26,10 +30,16 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen && productName) {
-      setFormData(prev => ({ ...prev, subject: `Cần mua sản phẩm: ${productName}` }));
+    if (isOpen) {
+      if (defaultSubject) {
+        setFormData(prev => ({ ...prev, subject: defaultSubject }));
+      } else if (productName) {
+        setFormData(prev => ({ ...prev, subject: `Cần mua sản phẩm: ${productName}` }));
+      } else {
+        setFormData(prev => ({ ...prev, subject: '' }));
+      }
     }
-  }, [isOpen, productName]);
+  }, [isOpen, productName, defaultSubject]);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -50,18 +60,40 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // KIỂM TRA SỐ ĐIỆN THOẠI HỢP LỆ (Định dạng VN: bắt đầu bằng 03, 05, 07, 08, 09 và đủ 10 số)
     const phoneRegex = /^(03|05|07|08|09)+([0-9]{8})$/;
     if (!phoneRegex.test(formData.phone)) {
       setPhoneError('Vui lòng nhập số điện thoại hợp lệ (10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09).');
-      return; // Dừng lại, không submit form
+      return;
     }
 
-    handleClose();
-    setFormData({ name: '', phone: '', email: '', subject: '', message: '' });
+    try {
+      setLoading(true);
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          content: `[Tiêu đề: ${formData.subject}]\n\n${formData.message}`,
+          productName: productName
+        })
+      });
+
+      if (!res.ok) throw new Error("Có lỗi xảy ra");
+
+      toast.success("Gửi yêu cầu thành công! Chúng tôi sẽ sớm liên hệ lại với bạn.");
+      handleClose();
+      setFormData({ name: '', phone: '', email: '', subject: '', message: '' });
+    } catch (err) {
+      toast.error("Không thể gửi yêu cầu lúc này, vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isVisible) return null;
@@ -170,12 +202,14 @@ export default function RegisterModal({ isOpen, onClose, title = "HÂN HẠNH Đ
             <div className="md:col-span-2 flex justify-center mt-3">
               <button
                 type="submit"
-                className="text-white font-black py-2.5 px-8 rounded-[4px] shadow-lg transition-all duration-300 uppercase tracking-widest text-[14px] hover:brightness-110 active:scale-95"
+                disabled={loading}
+                className="text-white font-black py-2.5 px-8 rounded-[4px] shadow-lg transition-all duration-300 uppercase tracking-widest text-[14px] hover:brightness-110 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
                 style={{
                   background: "linear-gradient(90deg, rgb(216, 0, 0) 0%, rgb(245, 2, 0) 50%, rgb(187, 1, 0) 100%)"
                 }}
               >
-                Gửi
+                {loading ? <span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-4 h-4 mr-2"></span> : null}
+                {loading ? 'Đang gửi...' : 'Gửi'}
               </button>
             </div>
           </form>

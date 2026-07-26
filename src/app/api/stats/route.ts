@@ -1,35 +1,45 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
     const [
-      { count: totalProducts },
-      { count: totalPosts },
-      { count: totalCategories },
-      { count: totalContacts },
-      { count: unreadContacts },
-      { data: recentContacts },
-      { data: topProducts },
+      totalProducts,
+      totalPosts,
+      totalCategories,
+      totalContacts,
+      unreadContacts,
+      pendingOrders,
+      recentContacts,
+      topProducts,
     ] = await Promise.all([
-      supabaseAdmin.from("products").select("*", { count: "exact", head: true }).eq("isPublished", true),
-      supabaseAdmin.from("posts").select("*", { count: "exact", head: true }).eq("isPublished", true),
-      supabaseAdmin.from("categories").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("contacts").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("contacts").select("*", { count: "exact", head: true }).eq("isRead", false),
-      supabaseAdmin.from("contacts").select("*").order("createdAt", { ascending: false }).limit(5),
-      supabaseAdmin.from("products").select("*, category:categories(*)").order("createdAt", { ascending: false }).limit(5),
+      prisma.product.count({ where: { isPublished: true } }),
+      prisma.post.count({ where: { isPublished: true } }),
+      prisma.category.count(),
+      prisma.contact.count(),
+      prisma.contact.count({ where: { isRead: false } }),
+      prisma.order.count({ where: { status: "PENDING" } }),
+      prisma.contact.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5
+      }),
+      prisma.product.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { category: true }
+      }),
     ]);
 
     return NextResponse.json({
       data: {
-        totalProducts: totalProducts || 0,
-        totalPosts: totalPosts || 0,
-        totalCategories: totalCategories || 0,
-        totalContacts: totalContacts || 0,
-        unreadContacts: unreadContacts || 0,
-        recentContacts: recentContacts || [],
-        recentProducts: topProducts || [],
+        totalProducts,
+        totalPosts,
+        totalCategories,
+        totalContacts,
+        unreadContacts,
+        pendingOrders,
+        recentContacts,
+        recentProducts: topProducts,
       },
     });
   } catch (error) {

@@ -17,7 +17,7 @@ interface Contact {
 export default function AdminContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "reset_password">("all");
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,11 +28,24 @@ export default function AdminContactsPage() {
   }, [filter]);
 
   useEffect(() => {
-    const q = filter === "unread" ? "?isRead=false" : "";
+    let q = "";
+    if (filter === "unread") q = "?isRead=false";
+    else if (filter === "reset_password") q = "?search=CẤP LẠI MẬT KHẨU"; // Will search name, email, phone (wait, API search doesn't search productName or content!)
+    
+    // Actually, we can fetch all and filter locally for reset_password if backend doesn't support searching by productName.
+    // Let's filter locally for this specific tab.
+    
     setLoading(true);
-    fetch(`/api/contacts${q}`)
+    fetch(`/api/contacts${filter === "unread" ? "?isRead=false" : ""}`)
       .then(r => r.json())
-      .then(d => { setContacts(d.data?.contacts || []); setLoading(false); })
+      .then(d => { 
+        let data = d.data?.contacts || [];
+        if (filter === "reset_password") {
+           data = data.filter((c: Contact) => c.productName === "YÊU CẦU CẤP LẠI MẬT KHẨU");
+        }
+        setContacts(data); 
+        setLoading(false); 
+      })
       .catch(() => setLoading(false));
   }, [filter]);
 
@@ -50,14 +63,16 @@ export default function AdminContactsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Tin nhắn liên hệ</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{contacts.length} tin nhắn</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Tin nhắn liên hệ</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{contacts.length} tin nhắn</p>
+        </div>
       </div>
 
       {/* Filter tabs */}
       <div className="flex gap-2">
-        {(["all", "unread"] as const).map(tab => (
+        {(["all", "unread", "reset_password"] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
@@ -67,7 +82,7 @@ export default function AdminContactsPage() {
                 : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
-            {tab === "all" ? "Tất cả" : "Chưa đọc"}
+            {tab === "all" ? "Tất cả" : tab === "unread" ? "Chưa đọc" : "Khôi phục mật khẩu"}
           </button>
         ))}
       </div>

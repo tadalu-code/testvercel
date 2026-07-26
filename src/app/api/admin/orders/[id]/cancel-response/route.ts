@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createClient } from "@/utils/supabase/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const session = await getServerSession(authOptions);
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -38,6 +38,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    if (order.userId) {
+      const isApproved = action === "APPROVE";
+      await prisma.notification.create({
+        data: {
+          userId: order.userId,
+          title: "Phản hồi yêu cầu hủy đơn",
+          message: isApproved 
+            ? `Yêu cầu hủy đơn hàng #${order.id.slice(0,8)} của bạn đã được chấp nhận.` 
+            : `Yêu cầu hủy đơn hàng #${order.id.slice(0,8)} của bạn đã bị từ chối.`,
+          type: "ORDER_STATUS",
+          linkUrl: "/user/account/purchase",
+        }
+      });
     }
 
     return NextResponse.json({ success: true });

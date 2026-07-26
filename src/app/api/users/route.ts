@@ -1,26 +1,40 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-    
-    if (error) throw error;
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        lockoutUntil: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
 
     const mappedUsers = users.map(user => ({
       id: user.id,
       email: user.email,
-      name: user.user_metadata?.name || 'Khách',
-      role: user.user_metadata?.role || 'user',
-      createdAt: user.created_at,
-      lastSignInAt: user.last_sign_in_at
+      name: user.name || 'Khách',
+      role: user.role,
+      createdAt: user.createdAt,
+      lastSignInAt: user.updatedAt,
+      lockoutUntil: user.lockoutUntil
     }));
 
-    // Sort by role: admin -> staff -> user, then by creation date
+    // Sort by role: admin -> staff -> user
     mappedUsers.sort((a, b) => {
       const roleWeight = { admin: 1, staff: 2, user: 3 } as any;
-      if (roleWeight[a.role] !== roleWeight[b.role]) {
-        return roleWeight[a.role] - roleWeight[b.role];
+      const weightA = roleWeight[a.role] || 3;
+      const weightB = roleWeight[b.role] || 3;
+      if (weightA !== weightB) {
+        return weightA - weightB;
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });

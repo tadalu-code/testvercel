@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Search, X, ShoppingCart, Star } from "lucide-react";
 import RegisterModal from "./RegisterModal";
 import { useCart } from "@/context/CartContext";
+import WishlistButton from "./WishlistButton";
 
 interface Product {
   id: string;
@@ -24,7 +25,7 @@ function formatPrice(price: number) {
 
 function ProductCard({ product, onContactClick }: { product: Product; onContactClick: () => void }) {
   const { addItem, openCart } = useCart();
-  const hasPrice = product.price != null || product.salePrice != null;
+  const hasPrice = (product.price != null && product.price > 0) || (product.salePrice != null && product.salePrice > 0);
   const displayPrice = product.salePrice ?? product.price;
   const isOnSale = product.salePrice != null && product.price != null && product.salePrice < product.price;
   const outOfStock = (product.stock ?? 1) === 0;
@@ -57,6 +58,11 @@ function ProductCard({ product, onContactClick }: { product: Product; onContactC
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
+        
+        {/* Nút Yêu thích */}
+        <div className="absolute top-2 right-2 z-10">
+          <WishlistButton productId={product.id} iconSize={16} className="!p-1.5" />
+        </div>
         {/* Badge */}
         {isOnSale && (
           <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">

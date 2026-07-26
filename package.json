@@ -10,11 +10,13 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.109.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",
+    "@types/react-google-recaptcha": "^2.1.9",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "jodit-react": "^5.3.21",
@@ -27,8 +29,10 @@
     "quill": "^2.0.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-google-recaptcha": "^3.1.0",
+    "react-google-recaptcha-v3": "^1.11.0",
+    "react-hot-toast": "^2.6.0",
     "recharts": "^3.9.2",
-    "ws": "^8.21.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -41,6 +45,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.1",
+    "typescript": "^5",
+    "ws": "^8.21.1"
   }
 }

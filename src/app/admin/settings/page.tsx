@@ -125,7 +125,7 @@ export default function SettingsPage() {
         <div className="p-6">
           {/* TAB: GIAO DIỆN */}
           {activeTab === "appearance" && (
-            <div className="space-y-6 max-w-2xl">
+            <div className="space-y-6 max-w-4xl">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                   Giao diện hiển thị
@@ -194,7 +194,7 @@ export default function SettingsPage() {
 
           {/* TAB: TÀI KHOẢN */}
           {activeTab === "account" && (
-            <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
+            <form onSubmit={handleSave} className="space-y-6 max-w-4xl">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                   Thông tin cá nhân
@@ -269,7 +269,7 @@ export default function SettingsPage() {
 
           {/* TAB: HỆ THỐNG */}
           {activeTab === "system" && (
-            <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
+            <form onSubmit={handleSave} className="space-y-6 max-w-4xl">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                   Cấu hình Website
@@ -328,7 +328,7 @@ export default function SettingsPage() {
 
           {/* TAB: LÝ DO HỦY ĐƠN */}
           {activeTab === "cancel-reasons" && (
-            <div className="space-y-6 max-w-2xl">
+            <div className="space-y-6 max-w-4xl">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                   Quản lý Lý do hủy đơn

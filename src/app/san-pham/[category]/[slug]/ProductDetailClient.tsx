@@ -3,9 +3,15 @@ import { useEffect, useState } from "react";
 import { getProductDetail, getProducts } from "@/services/api";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { X, ChevronLeft, ChevronRight, ZoomIn, Star } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ZoomIn, Star, ShoppingCart, Minus, Plus } from "lucide-react";
 import RegisterModal from "@/components/RegisterModal";
 import ProductReviews from "@/components/ProductReviews";
+import { useCart } from "@/context/CartContext";
+import WishlistButton from "@/components/WishlistButton";
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+};
 
 const parseImages = (urlStr: any) => {
   try {
@@ -44,6 +50,8 @@ export default function ProductDetailClient({ category, slug, initialProduct }: 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [qty, setQty] = useState(1);
+  const { addItem } = useCart();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -193,12 +201,91 @@ export default function ProductDetailClient({ category, slug, initialProduct }: 
           <div className="flex flex-col pt-2">
             <h1 className="text-[30px] font-medium text-[#222] mb-6">{product.name}</h1>
 
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="w-fit px-16 py-3 bg-[#007bff] text-white font-medium rounded-[4px] text-[16px] mb-10 hover:bg-blue-700 transition-colors"
-            >
-              Liên hệ
-            </button>
+            {/* HIỂN THỊ GIÁ */}
+            {product.price && product.price > 0 ? (
+              <div className="mb-6">
+                {product.salePrice ? (
+                  <div className="flex items-center gap-4">
+                    <span className="text-[24px] font-bold text-red-600">
+                      {formatCurrency(product.salePrice)}
+                    </span>
+                    <span className="text-[16px] text-gray-400 line-through">
+                      {formatCurrency(product.price)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[24px] font-bold text-[#007bff]">
+                    {formatCurrency(product.price)}
+                  </span>
+                )}
+              </div>
+            ) : null}
+
+            {/* LOGIC NÚT MUA / LIÊN HỆ */}
+            {!product.price || product.price === 0 ? (
+              <div className="flex items-center gap-4 mb-10">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-fit px-16 py-3 bg-[#007bff] text-white font-medium rounded-[4px] text-[16px] hover:bg-blue-700 transition-colors"
+                >
+                  Liên hệ tư vấn
+                </button>
+                <WishlistButton productId={product.id} className="!w-[48px] !h-[48px] !p-0 flex items-center justify-center !rounded-[4px] border border-gray-300 bg-white hover:bg-gray-50 shadow-none" iconSize={24} />
+              </div>
+            ) : product.stock === 0 ? (
+              <div className="flex items-center gap-4 mb-10">
+                <button
+                  disabled
+                  className="w-fit px-16 py-3 bg-gray-400 text-white font-medium rounded-[4px] text-[16px] cursor-not-allowed"
+                >
+                  Tạm hết hàng
+                </button>
+                <WishlistButton productId={product.id} className="!w-[48px] !h-[48px] !p-0 flex items-center justify-center !rounded-[4px] border border-gray-300 bg-white hover:bg-gray-50 shadow-none" iconSize={24} />
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 mb-10">
+                <div className="flex items-center border border-gray-300 rounded-[4px] h-[48px] overflow-hidden">
+                  <button
+                    onClick={() => setQty(Math.max(1, qty - 1))}
+                    className="w-10 h-full flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <input
+                    type="number"
+                    value={qty}
+                    onChange={(e) => setQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-12 h-full text-center text-sm font-medium focus:outline-none border-x border-gray-200"
+                    min="1"
+                  />
+                  <button
+                    onClick={() => setQty(qty + 1)}
+                    className="w-10 h-full flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    addItem({
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      salePrice: product.salePrice,
+                      image: parseImages(product.imagesUrl)[0] || "/placeholder.jpg",
+                      slug: product.slug,
+                      categorySlug: category,
+                      unit: product.unit
+                    }, qty);
+                  }}
+                  className="px-10 py-3 h-[48px] bg-[#007bff] text-white font-medium rounded-[4px] text-[16px] flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                >
+                  <ShoppingCart size={18} />
+                  Thêm vào giỏ
+                </button>
+                <WishlistButton productId={product.id} className="!w-[48px] !h-[48px] !p-0 flex items-center justify-center !rounded-[4px] border border-gray-300 bg-white hover:bg-gray-50 shadow-none" iconSize={24} />
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2.5">
               {allProducts?.slice(0, 24).map((p: any) => (

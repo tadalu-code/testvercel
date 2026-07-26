@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, Search, PackageSearch } from "lucide-react";
 import Pagination from "@/components/Pagination";
-import { createClient } from "@/utils/supabase/client";
+import { useSession } from "next-auth/react";
 
 interface Category { id: string; name: string; }
 
@@ -39,13 +39,12 @@ export default function AdminProductsPage() {
     setCurrentPage(1);
   }, [search, filterCategory, filterDate]);
 
+  const { data: session } = useSession();
+
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserRole(data.user.user_metadata?.role || "admin");
-      }
-    });
+    if (session?.user) {
+      setUserRole((session.user as any).role || "admin");
+    }
 
     // Fetch categories for filter dropdown
     fetch("/api/categories")
@@ -92,7 +91,7 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Sản phẩm</h1>
           <p className="text-sm text-gray-500 mt-0.5">{products.length} sản phẩm</p>
@@ -107,8 +106,8 @@ export default function AdminProductsPage() {
         )}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap md:flex-row gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text"

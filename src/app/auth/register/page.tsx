@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,17 +18,17 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState("");
 
   const handleGoogleLogin = async () => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${location.origin}/admin`,
-      },
-    });
+    signIn("google", { callbackUrl: "/" });
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!executeRecaptcha) {
+      setError("Hệ thống chống spam chưa sẵn sàng, vui lòng thử lại sau.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSuccess("");
@@ -37,26 +39,35 @@ export default function RegisterPage() {
       return;
     }
 
-    const supabase = createClient();
-    const authEmail = email.includes("@") ? email : `${email}@nongduoc.vn`;
+    try {
+      const recaptchaToken = await executeRecaptcha("register_submit");
 
-    const { error: authError } = await supabase.auth.signUp({
-      email: authEmail,
-      password,
-    });
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password, recaptchaToken }),
+      });
 
-    if (authError) {
-      setError(authError.message || "Đã xảy ra lỗi khi đăng ký");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Đã xảy ra lỗi khi đăng ký");
+        setLoading(false);
+        return;
+      }
+
+      setSuccess("Đăng ký thành công!");
       setLoading(false);
-      return;
+      
+      setTimeout(() => {
+        router.push("/auth/login");
+      }, 3000);
+    } catch (err: any) {
+      setError("Lỗi kết nối máy chủ");
+      setLoading(false);
     }
-
-    setSuccess("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận.");
-    setLoading(false);
-    // Có thể chuyển hướng sang trang đăng nhập sau vài giây
-    setTimeout(() => {
-      router.push("/auth/login");
-    }, 3000);
   };
 
   return (

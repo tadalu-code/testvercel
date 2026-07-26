@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,25 +8,36 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const search = searchParams.get("search") || "";
+    const isReadParam = searchParams.get("isRead");
     
-    const offset = (page - 1) * limit;
-    const sb = supabaseAdmin;
-    
-    let query = sb
-      .from("contacts")
-      .select("*", { count: "exact" })
-      .order("createdAt", { ascending: false })
-      .range(offset, offset + limit - 1);
+    const skip = (page - 1) * limit;
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    const where: Prisma.ContactWhereInput = {};
+
+    if (isReadParam !== null) {
+      where.isRead = isReadParam === "true";
     }
 
-    const { data: contacts, count, error } = await query;
-    if (error) throw error;
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { email: { contains: search } },
+        { phone: { contains: search } }
+      ];
+    }
+
+    const [contacts, totalItems] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" }
+      }),
+      prisma.contact.count({ where })
+    ]);
 
     return NextResponse.json({
-      data: { contacts: contacts || [], totalItems: count || 0, page, limit },
+      data: { contacts, totalItems, page, limit },
     });
   } catch (error) {
     console.error("[GET /api/contacts]", error);
@@ -36,27 +48,38 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, phone, subject, message } = body;
+    const { name, email, phone, content, productName } = body;
 
-    if (!name || !message) {
-      return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 });
+    if (!name || !phone) {
+      return NextResponse.json({ error: "Vui lòng nhập tên và số điện thoại" }, { status: 400 });
     }
 
-    const sb = supabaseAdmin;
-    const { data: contact, error } = await sb
-      .from("contacts")
-      .insert({
+    // Rate Limiting (5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentContact = await prisma.contact.findFirst({
+      where: {
+        OR: [
+          { phone: phone },
+          ...(email ? [{ email: email }] : [])
+        ],
+        createdAt: { gte: fiveMinutesAgo }
+      }
+    });
+
+    if (recentContact) {
+      return NextResponse.json({ error: "Bạn thao tác quá nhanh, vui lòng thử lại sau 5 phút." }, { status: 429 });
+    }
+
+    const contact = await prisma.contact.create({
+      data: {
         name,
         email: email || null,
         phone: phone || null,
-        subject: subject || null,
-        message,
+        content: content || null,
+        productName: productName || null,
         isRead: false
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+      }
+    });
 
     return NextResponse.json({ data: contact }, { status: 201 });
   } catch (error) {
@@ -64,4 +87,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Lỗi gửi liên hệ" }, { status: 500 });
   }
 }
-

@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const { data: product, error } = await supabaseAdmin
-      .from('products')
-      .select('*, category:categories(*)')
-      .or(`id.eq.${id},slug.eq.${id}`)
-      .single();
+    
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { id: id },
+          { slug: id }
+        ]
+      },
+      include: {
+        category: true
+      }
+    });
 
-    if (error || !product) {
+    if (!product) {
       return NextResponse.json({ error: "Không tìm thấy sản phẩm" }, { status: 404 });
     }
 
@@ -29,13 +36,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const body = await req.json();
     const { name, slug, description, imagesUrl, categoryId, isPublished, price, salePrice, stock, unit, technicalSpecs, metaTitle, metaDescription, metaKeywords } = body;
 
-    const { data: product, error } = await supabaseAdmin
-      .from('products')
-      .update({
+    // Lấy thông tin sản phẩm hiện tại để kiểm tra tồn kho
+    const existingProduct = await prisma.product.findUnique({
+      where: { id },
+      select: { stock: true }
+    });
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
         name,
         slug,
         description: description || "",
-        specifications: technicalSpecs || null,
+        technicalSpecs: technicalSpecs || null,
         imagesUrl: imagesUrl || [],
         categoryId: categoryId || null,
         isPublished: isPublished ?? true,
@@ -46,31 +59,58 @@ export async function PUT(req: NextRequest, { params }: Params) {
         metaTitle: metaTitle || null,
         metaDescription: metaDescription || null,
         metaKeywords: metaKeywords || null,
-        updatedAt: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
+      },
+      include: {
+        category: true
+      }
+    });
 
-    if (error) {
-      return NextResponse.json({ error: "Lỗi cập nhật" }, { status: 500 });
+    // Nếu trước đó hết hàng (stock = 0) và bây giờ có hàng (stock > 0)
+    if (existingProduct?.stock === 0 && (stock ?? 0) > 0) {
+      // Tìm tất cả user đã yêu thích sản phẩm này
+      const wishlists = await prisma.wishlist.findMany({
+        where: { productId: id },
+        select: { userId: true }
+      });
+
+      if (wishlists.length > 0) {
+        const catSlug = product.category?.slug || "tat-ca";
+        await prisma.notification.createMany({
+          data: wishlists.map(w => ({
+            userId: w.userId,
+            title: "Sản phẩm yêu thích đã có hàng! 📦",
+            message: `Sản phẩm "${product.name}" mà bạn yêu thích đã có hàng trở lại. Nhanh tay đặt mua nhé!`,
+            type: "STOCK_UPDATE",
+            linkUrl: `/san-pham/${catSlug}/${product.slug}`
+          }))
+        });
+      }
     }
 
     return NextResponse.json({ data: product });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[PUT /api/products/[id]]", error);
-    return NextResponse.json({ error: "Lỗi Server" }, { status: 500 });
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: "Không tìm thấy sản phẩm" }, { status: 404 });
+    }
+    return NextResponse.json({ error: "Lỗi cập nhật" }, { status: 500 });
   }
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
-    if (error) throw error;
+    
+    await prisma.product.delete({
+      where: { id }
+    });
+    
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[DELETE /api/products/[id]]", error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: "Không tìm thấy sản phẩm" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Lỗi Server" }, { status: 500 });
   }
 }

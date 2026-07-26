@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Upload, Loader2, X } from "lucide-react";
 import { supabaseClient } from "@/lib/supabase-client";
 
 interface Category { id: string; name: string; }
@@ -121,7 +121,7 @@ export default function NewProductPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/admin/products" className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
@@ -133,7 +133,8 @@ export default function NewProductPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5 shadow-sm">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-5 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">{error}</div>
         )}
@@ -202,38 +203,6 @@ export default function NewProductPage() {
           />
         </div>
 
-        {/* URL ảnh */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            Hình ảnh
-          </label>
-          <div className="flex flex-col gap-3">
-            <label className="relative inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors self-start">
-              <input 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
-              {uploading ? (
-                <Loader2 size={16} className="animate-spin text-blue-600" />
-              ) : (
-                <Upload size={16} className="text-gray-500" />
-              )}
-              {uploading ? "Đang tải ảnh lên..." : "Chọn ảnh từ máy tính"}
-            </label>
-
-            <textarea
-              value={form.imagesUrl}
-              onChange={(e) => setForm({ ...form, imagesUrl: e.target.value })}
-              rows={3}
-              placeholder="Hoặc dán link trực tiếp vào đây..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono"
-            />
-          </div>
-        </div>
-
         {/* Giá + Tồn kho */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -248,7 +217,7 @@ export default function NewProductPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Giá khuyến mãi (VND)</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Giá bán (VND)</label>
             <input
               type="number"
               min="0"
@@ -294,67 +263,6 @@ export default function NewProductPage() {
           </label>
         </div>
 
-        {/* === KHỐI SEO === */}
-        <div className="border-t border-gray-100 pt-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-green-600 bg-green-50 px-2 py-0.5 rounded-full">SEO</span>
-            <p className="text-xs text-gray-400">Tối ưu hoá hiển thị trên Google & mạng xã hội</p>
-          </div>
-
-          {/* SEO Title */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-semibold text-gray-700">Tiêu đề SEO (Meta Title)</label>
-              <span className={`text-xs font-mono ${
-                form.metaTitle.length > 60 ? "text-red-500" :
-                form.metaTitle.length >= 40 ? "text-green-600" : "text-gray-400"
-              }`}>{form.metaTitle.length}/60</span>
-            </div>
-            <input
-              type="text"
-              value={form.metaTitle}
-              onChange={(e) => setForm({ ...form, metaTitle: e.target.value })}
-              placeholder="Ví dụ: Thuốc trừ sâu XYZ - Hiệu quả cao, an toàn"
-              maxLength={80}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">Nên từ 40–60 ký tự. Để trống thì dùng tên sản phẩm.</p>
-          </div>
-
-          {/* SEO Description */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-semibold text-gray-700">Mô tả SEO (Meta Description)</label>
-              <span className={`text-xs font-mono ${
-                form.metaDescription.length > 160 ? "text-red-500" :
-                form.metaDescription.length >= 100 ? "text-green-600" : "text-gray-400"
-              }`}>{form.metaDescription.length}/160</span>
-            </div>
-            <textarea
-              value={form.metaDescription}
-              onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
-              rows={3}
-              placeholder="Mô tả ngắn gọn về sản phẩm, hiển thị dưới tiêu đề trên Google..."
-              maxLength={200}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-            />
-            <p className="text-xs text-gray-400 mt-1">Nên từ 100–160 ký tự. Để trống thì dùng mô tả sản phẩm.</p>
-          </div>
-
-          {/* SEO Keywords */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Từ khoá (Keywords)</label>
-            <input
-              type="text"
-              value={form.metaKeywords}
-              onChange={(e) => setForm({ ...form, metaKeywords: e.target.value })}
-              placeholder="thuốc trừ sâu, nông dược, bảo vệ thực vật..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">Các từ khoá cách nhau bằng dấu phẩy.</p>
-          </div>
-        </div>
-
         {/* Actions */}
         <div className="flex gap-3 pt-2">
           <button
@@ -368,6 +276,116 @@ export default function NewProductPage() {
           <Link href="/admin/products" className="px-6 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
             Huỷ
           </Link>
+        </div>
+        </div>
+
+        {/* Right column */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <h3 className="font-semibold text-gray-800">Hình ảnh</h3>
+            
+            {/* Image Preview Grid */}
+            {form.imagesUrl && (
+              <div className="grid grid-cols-2 gap-3">
+                {form.imagesUrl.split('\n').filter(url => url.trim()).map((url, idx) => (
+                  <div key={idx} className="relative group rounded-xl border border-gray-200 overflow-hidden bg-gray-50 aspect-[4/3]">
+                    <img src={url.trim()} alt="preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const urls = form.imagesUrl.split('\n').filter(u => u.trim());
+                        urls.splice(idx, 1);
+                        setForm({...form, imagesUrl: urls.join('\n')});
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shadow-sm"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <label className="relative inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 cursor-pointer self-start">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+                {uploading ? (
+                  <Loader2 size={16} className="animate-spin text-blue-600" />
+                ) : (
+                  <Upload size={16} className="text-gray-500" />
+                )}
+                {uploading ? "Đang tải ảnh lên..." : "Chọn ảnh từ máy tính"}
+              </label>
+
+              <textarea
+                value={form.imagesUrl}
+                onChange={(e) => setForm({ ...form, imagesUrl: e.target.value })}
+                rows={3}
+                placeholder="Hoặc dán link trực tiếp vào đây..."
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold uppercase tracking-widest text-green-600 bg-green-50 px-2 py-0.5 rounded-full">SEO</span>
+              <p className="text-xs text-gray-400">Tối ưu hoá trên Google</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-gray-700">Tiêu đề (Meta Title)</label>
+                <span className={`text-xs font-mono ${
+                  form.metaTitle.length > 60 ? "text-red-500" :
+                  form.metaTitle.length >= 40 ? "text-green-600" : "text-gray-400"
+                }`}>{form.metaTitle.length}/60</span>
+              </div>
+              <input
+                type="text"
+                value={form.metaTitle}
+                onChange={(e) => setForm({ ...form, metaTitle: e.target.value })}
+                placeholder="Ví dụ: Thuốc trừ sâu XYZ..."
+                maxLength={80}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-gray-700">Mô tả (Meta Description)</label>
+                <span className={`text-xs font-mono ${
+                  form.metaDescription.length > 160 ? "text-red-500" :
+                  form.metaDescription.length >= 100 ? "text-green-600" : "text-gray-400"
+                }`}>{form.metaDescription.length}/160</span>
+              </div>
+              <textarea
+                value={form.metaDescription}
+                onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
+                rows={4}
+                placeholder="Mô tả ngắn gọn về sản phẩm..."
+                maxLength={200}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Từ khoá (Keywords)</label>
+              <input
+                type="text"
+                value={form.metaKeywords}
+                onChange={(e) => setForm({ ...form, metaKeywords: e.target.value })}
+                placeholder="thuốc trừ sâu, nông dược..."
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
         </div>
       </form>
     </div>

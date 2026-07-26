@@ -1,32 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { generateVNPayUrl } from "@/lib/vnpay";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "";
 
-    let query = supabaseAdmin
-      .from("orders")
-      .select(`
-        *,
-        items:order_items(
-          *,
-          product:products(*)
-        )
-      `, { count: "exact" })
-      .order("createdAt", { ascending: false });
+    const where = (status && status !== "ALL") ? { status: status as any } : {};
 
-    if (status && status !== "ALL") {
-      query = query.eq("status", status);
-    }
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              product: true
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" }
+      }),
+      prisma.order.count({ where })
+    ]);
 
-    const { data: orders, count: total, error } = await query;
+    const userIds = [...new Set(orders.map((o: any) => o.userId).filter(Boolean))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds as string[] } },
+      select: { id: true, name: true, email: true, phone: true }
+    });
 
-    if (error) throw error;
+    const ordersWithUsers = orders.map((order: any) => {
+      const account = users.find(u => u.id === order.userId);
+      return {
+        ...order,
+        account: account || null
+      };
+    });
 
     return NextResponse.json({
-      data: { orders: orders || [], total: total || 0 },
+      data: { orders: ordersWithUsers, total },
     });
   } catch (error) {
     console.error("[GET /api/orders]", error);
@@ -37,7 +52,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, phone, address, note, items } = body;
+    const { fullName, phone, address, note, items, couponCode, discountAmount: clientDiscount, paymentMethod = "COD" } = body;
 
     if (!fullName || !phone || !address || !items || items.length === 0) {
       return NextResponse.json({ error: "Thiếu thông tin đơn hàng" }, { status: 400 });
@@ -49,12 +64,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Không có sản phẩm hợp lệ trong giỏ hàng" }, { status: 400 });
     }
 
-    const { data: products, error: productError } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .in("id", productIds);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } }
+    });
 
-    if (productError || !products || products.length === 0) {
+    if (!products || products.length === 0) {
       return NextResponse.json({ error: "Không tìm thấy sản phẩm" }, { status: 404 });
     }
 
@@ -80,74 +94,102 @@ export async function POST(request: NextRequest) {
 
     const isCanTho = address.toLowerCase().includes("cần thơ") || address.toLowerCase().includes("can tho");
     const shippingFee = isCanTho ? 0 : 30000;
-    totalAmount += shippingFee;
+    
+    let subTotalAmount = totalAmount; // Without shipping
+    
+    // Validate Coupon
+    let actualDiscount = 0;
+    if (couponCode) {
+      const coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
+      if (coupon && coupon.isActive) {
+        let valid = true;
+        const now = new Date();
+        if (coupon.startDate && now < coupon.startDate) valid = false;
+        if (coupon.endDate && now > coupon.endDate) valid = false;
+        if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) valid = false;
+        if (coupon.minOrderValue && subTotalAmount < coupon.minOrderValue) valid = false;
 
-    const { createClient } = require("@/utils/supabase/server");
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user ? user.id : null;
-
-    const orderId = crypto.randomUUID();
-
-    // Tạo đơn hàng
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        id: orderId,
-        userId: userId,
-        fullName,
-        phone,
-        address,
-        note: note || null,
-        totalAmount,
-        status: "PENDING",
-        paymentMethod: "COD",
-        paymentStatus: "UNPAID",
-      })
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    // Tạo chi tiết đơn hàng
-    const itemsToInsert = orderItemsData.map(item => ({
-      id: crypto.randomUUID(),
-      orderId: orderId,
-      ...item
-    }));
-
-    const { error: itemsError } = await supabaseAdmin
-      .from("order_items")
-      .insert(itemsToInsert);
-
-    if (itemsError) {
-      // Revert if items failed
-      await supabaseAdmin.from("orders").delete().eq("id", orderId);
-      throw itemsError;
-    }
-
-    // Trừ tồn kho bằng RPC (Database Function) để tránh lỗi xung đột (Race Condition)
-    for (const item of orderItemsData) {
-      const { error: rpcError } = await supabaseAdmin.rpc("decrement_stock", {
-        p_id: item.productId,
-        p_quantity: item.quantity,
-      });
-
-      if (rpcError) {
-        // Hoàn tác nếu trừ kho thất bại (hết hàng do race condition)
-        await supabaseAdmin.from("orders").delete().eq("id", orderId);
-        throw new Error(rpcError.message || `Lỗi trừ tồn kho sản phẩm ${item.productId}`);
+        if (valid) {
+          if (coupon.discountType === "FIXED") {
+            actualDiscount = coupon.discountValue;
+          } else if (coupon.discountType === "PERCENTAGE") {
+            actualDiscount = (subTotalAmount * coupon.discountValue) / 100;
+            if (coupon.maxDiscountAmount && actualDiscount > coupon.maxDiscountAmount) {
+              actualDiscount = coupon.maxDiscountAmount;
+            }
+          }
+          if (actualDiscount > subTotalAmount) {
+            actualDiscount = subTotalAmount;
+          }
+        }
       }
     }
 
-    // Fetch full order to return
-    const { data: fullOrder } = await supabaseAdmin
-      .from("orders")
-      .select("*, items:order_items(*)")
-      .eq("id", orderId)
-      .single();
+    totalAmount = subTotalAmount - actualDiscount + shippingFee;
+    if (totalAmount < 0) totalAmount = 0;
 
-    return NextResponse.json({ data: fullOrder }, { status: 201 });
+    const session = await getServerSession(authOptions);
+    const userId = session?.user ? (session.user as any).id : null;
+
+    // Run order creation and stock decrement in a transaction
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          userId,
+          fullName,
+          phone,
+          address,
+          note: note || null,
+          totalAmount,
+          couponCode: actualDiscount > 0 ? couponCode : null,
+          discountAmount: actualDiscount,
+          status: "PENDING",
+          paymentMethod: paymentMethod === "VNPAY" ? "VNPAY" : "COD",
+          paymentStatus: "UNPAID",
+          items: {
+            create: orderItemsData.map((item: any) => ({
+              productId: item.productId,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity
+            }))
+          }
+        },
+        include: {
+          items: true
+        }
+      });
+
+      // Decrement stock
+      for (const item of orderItemsData) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: { decrement: item.quantity }
+          }
+        });
+      }
+
+      // Increment coupon usage
+      if (actualDiscount > 0 && couponCode) {
+        await tx.coupon.update({
+          where: { code: couponCode },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
+      return newOrder;
+    });
+
+    if (paymentMethod === "VNPAY") {
+      const ipAddr = request.headers.get("x-forwarded-for") || "127.0.0.1";
+      const orderInfo = `Thanh toan don hang ${order.id}`;
+      const vnpUrl = generateVNPayUrl(ipAddr.split(',')[0], totalAmount, orderInfo, order.id);
+      
+      return NextResponse.json({ data: order, vnpUrl }, { status: 201 });
+    }
+
+    return NextResponse.json({ data: order }, { status: 201 });
   } catch (error: any) {
     console.error("[POST /api/orders]", error);
     return NextResponse.json({ error: error.message || "Lỗi tạo đơn hàng" }, { status: 500 });

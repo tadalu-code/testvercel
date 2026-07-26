@@ -15,6 +15,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{link: string, email: string} | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -30,6 +31,22 @@ export default function AdminUsersPage() {
       console.error(error);
     }
     setLoading(false);
+  };
+
+  const generateResetLink = async (userId: string, email: string) => {
+    setUpdating(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-link`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.link) {
+        setResetLink({ link: data.link, email });
+      } else {
+        alert("Lỗi: " + (data.error || "Không thể tạo link"));
+      }
+    } catch (err) {
+      alert("Lỗi kết nối");
+    }
+    setUpdating(null);
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -131,15 +148,23 @@ export default function AdminUsersPage() {
                       {updating === user.id ? (
                         <Loader2 size={16} className="animate-spin text-gray-400 inline-block ml-auto" />
                       ) : (
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                        >
-                          <option value="user">Khách hàng</option>
-                          <option value="staff">Nhân viên</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <div className="flex flex-col items-end gap-2">
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                          >
+                            <option value="user">Khách hàng</option>
+                            <option value="staff">Nhân viên</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button
+                            onClick={() => generateResetLink(user.id, user.email)}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Tạo Link Khôi phục
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -149,6 +174,46 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal hiển thị Link khôi phục */}
+      {resetLink && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Link Khôi Phục Mật Khẩu</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Đã tạo link khôi phục cho tài khoản: <strong>{resetLink.email}</strong>
+            </p>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                readOnly 
+                value={resetLink.link} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none"
+              />
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(resetLink.link);
+                  alert("Đã copy!");
+                }}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors whitespace-nowrap"
+              >
+                Copy
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Link này chỉ có hiệu lực 1 lần và sẽ hết hạn sau 24h.
+            </p>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setResetLink(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

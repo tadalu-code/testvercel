@@ -81,7 +81,7 @@ export default function AdminPostsPage() {
         </div>
         <Link
           href="/admin/posts/new"
-          className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
         >
           <Plus size={16} /> Thêm bài viết
         </Link>
